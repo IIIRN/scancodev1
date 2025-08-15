@@ -5,8 +5,7 @@ import { db } from '../../../lib/firebase';
 import { collection, query, where, getDocs, onSnapshot, writeBatch } from 'firebase/firestore';
 import useLiff from '../../../hooks/useLiff';
 import { QRCodeSVG } from 'qrcode.react';
-import { useStudentContext } from '../../../context/StudentContext';
-import ProfileSetupForm from '../../../components/student/ProfileSetupForm';
+import ProfileSetupForm from '../../../components/student/ProfileSetupForm'; // 👈 1. Import ฟอร์มเข้ามา
 
 // --- Helper Components (defined at the top level for stability) ---
 
@@ -75,8 +74,7 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr }) => {
 
 // --- Main Page Component ---
 export default function MyRegistrationsPage() {
-  const { liffProfile, studentDbProfile, isLoading, error } = useLiff();
-  const { setIsLinkModalOpen } = useStudentContext();
+  const { liffProfile, studentDbProfile, isLoading, error, setStudentDbProfile } = useLiff(); // 👈 2. ดึง setStudentDbProfile มาใช้
   
   const [registrations, setRegistrations] = useState([]);
   const [activities, setActivities] = useState({});
@@ -88,7 +86,11 @@ export default function MyRegistrationsPage() {
   // Effect for fetching base data and listening for real-time registration updates
   useEffect(() => {
     if (!studentDbProfile || !liffProfile) {
-      setIsLoadingData(false);
+      // Don't set loading to false here if studentDbProfile is null, 
+      // because we might be showing the setup form.
+      if (studentDbProfile === null) {
+          setIsLoadingData(false);
+      }
       return;
     }
     setIsLoadingData(true);
@@ -132,7 +134,10 @@ export default function MyRegistrationsPage() {
 
     const syncAdminRegistrations = async () => {
         try {
+            // Check only if the profile is not yet linked (`studentDbProfile` exists but might be from form setup)
             const nationalId = studentDbProfile.nationalId;
+            if (!nationalId) return; // Cannot sync without nationalId
+
             const unlinkedRegQuery = query(
                 collection(db, 'registrations'),
                 where("nationalId", "==", nationalId),
@@ -158,23 +163,16 @@ export default function MyRegistrationsPage() {
   if (isLoading) return <div className="text-center p-10 font-sans">กำลังโหลดข้อมูลผู้ใช้...</div>;
   if (error) return <div className="p-4 text-center text-red-500 bg-red-100 font-sans">{error}</div>;
 
-  // If no Firestore profile, prompt the user to link their account via the header
-  if (!studentDbProfile) {
+  // 👇 3. เปลี่ยน Logic ตรงนี้: ถ้า studentDbProfile เป็น null ให้แสดงฟอร์มสร้างโปรไฟล์
+  if (studentDbProfile === null) {
     return (
-      <div className="max-w-4xl mx-auto p-4 md:p-8 text-center">
-        <div className="bg-white p-8 rounded-lg shadow-md">
-          <h1 className="text-xl font-bold text-gray-800">ไม่พบข้อมูลโปรไฟล์</h1>
-          <p className="text-gray-600 mt-2 mb-6">
-            หากคุณถูกลงทะเบียนโดยเจ้าหน้าที่ กรุณาเชื่อมข้อมูลโปรไฟล์ของคุณเพื่อดูรายการ
-          </p>
-          <button 
-            onClick={() => setIsLinkModalOpen(true)}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"
-          >
-            อัปเดต / เชื่อมข้อมูลด้วยเลขบัตรประชาชน
-          </button>
-        </div>
-      </div>
+      <ProfileSetupForm 
+        liffProfile={liffProfile}
+        onProfileCreated={(newProfile) => {
+            // เมื่อสร้างโปรไฟล์สำเร็จ ให้อัปเดต state ใน useLiff hook
+            setStudentDbProfile(newProfile); 
+        }}
+      />
     );
   }
   
