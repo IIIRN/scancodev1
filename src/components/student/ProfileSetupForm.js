@@ -66,7 +66,7 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
           
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-          <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-green-600 text-white font-bold rounded-md hover:bg-green-700 disabled:bg-green-300 transition-colors">
+          <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-primary  text-white font-bold rounded-md hover:bg-primary-hover  transition-colors">
             {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกและเริ่มต้นใช้งาน'}
           </button>
         </form>

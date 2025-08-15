@@ -96,7 +96,6 @@ export default function RegisterLiffPage() {
           <hr/>
           <p>แสดง QR Code นี้ให้เจ้าหน้าที่:</p>
           <div style={{ background: 'white', padding: '16px', display: 'inline-block' }}>
-            {/* 👇 2. เปลี่ยนชื่อ Component ให้ตรงกับที่ import */}
             <QRCodeSVG value={registration.id} size={256} />
           </div>
           <p style={{ marginTop: '10px', color: '#666' }}>ID: {registration.id}</p>

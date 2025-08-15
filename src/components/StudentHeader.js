@@ -18,7 +18,7 @@ export default function StudentHeader() {
 
   if (isLoading || !liffProfile) {
     return (
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 shadow-md text-white animate-pulse">
+      <header className="bg-primary p-4 shadow-md text-white animate-pulse">
         <div className="max-w-4xl mx-auto"><div className="h-28"></div></div>
       </header>
     );
@@ -31,7 +31,7 @@ export default function StudentHeader() {
   return (
     <>
       {/* Modal ถูกลบออกไปจากส่วนนี้ */}
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 shadow-md text-white sticky top-0 z-40 font-sans">
+      <header className="bg-primary p-4 shadow-md text-white sticky top-0 z-40 font-sans">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-4">
             <Image
@@ -49,7 +49,7 @@ export default function StudentHeader() {
 
           {/* 👇 3. ปุ่มสำหรับเชื่อมข้อมูลถูกลบออก */}
 
-          <div className="flex justify-center bg-black/20 rounded-lg p-1">
+          <div className="flex justify-center bg-black/40 rounded-lg p-1">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (

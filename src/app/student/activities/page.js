@@ -108,7 +108,7 @@ export default function ActivitiesListPage() {
                     className={`w-full text-center block px-4 py-2 font-semibold rounded-lg ${
                       isFull 
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-primary text-white hover:bg-primary-hover'
                     }`}
                     aria-disabled={isFull}
                     onClick={(e) => isFull && e.preventDefault()}

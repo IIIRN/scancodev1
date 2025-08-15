@@ -34,7 +34,7 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr }) => {
   const activityDate = activity.activityDate.toDate();
   return (
     <div className="bg-white rounded-xl shadow-lg flex overflow-hidden">
-      <div className="flex-none w-32 bg-indigo-700 text-white flex flex-col justify-center items-center p-4 text-center">
+      <div className="flex-none w-32 bg-primary text-white flex flex-col justify-center items-center p-4 text-center">
         {reg.seatNumber ? (
           <>
             <span className="text-xs opacity-75">เลขที่นั่งของคุณ</span>

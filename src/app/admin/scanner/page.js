@@ -163,6 +163,7 @@ export default function AdminScannerPage() {
       if (registrationData.lineUserId) {
           const flexMessage = createCheckInSuccessFlex({
             courseName: courseName,
+            activityName: activityData.name,
             fullName: registrationData.fullName,
             studentId: registrationData.studentId,
             seatNumber: seatNumberInput.trim(),

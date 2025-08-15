@@ -81,6 +81,7 @@ function RegistrationComponent() {
       
       const flexMessage = createRegistrationSuccessFlex({
           courseName: courseName,
+          activityName: activity?.name,
           fullName: studentDbProfile.fullName,
           studentId: studentDbProfile.studentId
       });
@@ -123,7 +124,7 @@ function RegistrationComponent() {
             <div className="bg-white p-6 rounded-lg shadow-md text-center">
                 <h2 className="text-2xl font-bold text-red-600 mb-2">กรุณาตั้งค่าโปรไฟล์ก่อน</h2>
                 <p className="text-gray-600 mb-6">เราต้องการข้อมูลเพิ่มเติมจากคุณก่อนทำการลงทะเบียนกิจกรรม</p>
-                <Link href="/student/my-registrations" className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
+                <Link href="/student/my-registrations" className="px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover">
                     ไปที่หน้าตั้งค่าโปรไฟล์
                 </Link>
             </div>
@@ -145,7 +146,7 @@ function RegistrationComponent() {
         
         {message && <p className="text-red-500 text-sm text-center my-4">{message}</p>}
 
-        <button type="submit" disabled={isSubmitting || !activity} className="w-full mt-6 py-3 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 disabled:bg-gray-400">
+        <button type="submit" disabled={isSubmitting || !activity} className="w-full mt-6 py-3 bg-primary text-white font-semibold rounded-md hover:bg-bg-primary/60 disabled:bg-gray-400">
           {isSubmitting ? 'กำลังดำเนินการ...' : 'ยืนยันการลงทะเบียน'}
         </button>
       </form>
