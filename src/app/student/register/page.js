@@ -7,10 +7,11 @@ import { collection, addDoc, query, where, serverTimestamp, doc, getDoc, getDocs
 import { QRCodeSVG } from 'qrcode.react';
 import useLiff from '../../../hooks/useLiff';
 import Link from 'next/link';
+// 👇 1. Import ฟังก์ชันสำหรับสร้าง Flex Message เข้ามา
+import { createRegistrationSuccessFlex } from '../../../lib/flexMessageTemplates';
 
-// Component หลักที่บรรจุ Logic
+// ... (ส่วน RegistrationComponent) ...
 function RegistrationComponent() {
-  // 1. ดึงโปรไฟล์ทั้ง 2 แบบจาก Hook
   const { liffProfile, studentDbProfile, isLoading, error } = useLiff();
   const searchParams = useSearchParams();
   const activityIdFromUrl = searchParams.get('activityId');
@@ -20,11 +21,9 @@ function RegistrationComponent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Effect: ดึงข้อมูลกิจกรรมและตรวจสอบสถานะการลงทะเบียน
   useEffect(() => {
     if (!liffProfile || !activityIdFromUrl) return;
 
-    // ดึงข้อมูลกิจกรรม
     const fetchActivity = async () => {
       const activityDoc = await getDoc(doc(db, 'activities', activityIdFromUrl));
       if (activityDoc.exists()) {
@@ -32,7 +31,6 @@ function RegistrationComponent() {
       }
     };
 
-    // ตรวจสอบว่าเคยลงทะเบียนกิจกรรมนี้หรือยัง
     const checkExistingRegistration = async () => {
       const q = query(
         collection(db, 'registrations'),
@@ -49,7 +47,6 @@ function RegistrationComponent() {
     checkExistingRegistration();
   }, [liffProfile, activityIdFromUrl]);
 
-  // ฟังก์ชันยืนยันการลงทะเบียน
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!studentDbProfile) {
@@ -60,7 +57,6 @@ function RegistrationComponent() {
     setIsSubmitting(true);
     setMessage('');
     
-    // 2. ดึงข้อมูลจาก studentDbProfile มาใช้โดยตรง ไม่ต้องกรอกใหม่
     const registrationData = {
       fullName: studentDbProfile.fullName,
       studentId: studentDbProfile.studentId,
@@ -76,24 +72,31 @@ function RegistrationComponent() {
     try {
       const docRef = await addDoc(collection(db, 'registrations'), registrationData);
       
-      const notificationMessage = `คุณได้ลงทะเบียนเข้าร่วมกิจกรรม '${activity?.name}' สำเร็จแล้ว! 🚀...`;
+      // 👇 2. เรียกใช้ฟังก์ชันเพื่อสร้าง Flex Message
+      const flexMessage = createRegistrationSuccessFlex({
+          activityName: activity?.name,
+          fullName: studentDbProfile.fullName
+      });
 
-      await fetch('/api/send-notification', { /* ... */ });
+      await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: liffProfile.userId, flexMessage: flexMessage })
+      });
       
       setRegistration({ id: docRef.id, ...registrationData });
     } catch (error) {
+      console.error("Error during registration:", error);
       setMessage('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- ส่วนแสดงผล ---
+  // ... (ส่วนที่เหลือของ Component ไม่มีการเปลี่ยนแปลง) ...
   if (isLoading) return <div className="text-center p-10">กำลังโหลด...</div>;
   if (error) return <div className="p-4 text-center text-red-600 bg-red-100">{error}</div>;
 
-  // 3. ตรวจสอบเงื่อนไขสำคัญ
-  // ถ้าเจอว่าเคยลงทะเบียนแล้ว ให้แสดง QR Code ทันที
   if (registration) {
     return (
       <div className="max-w-4xl mx-auto p-4 md:p-8">
@@ -108,7 +111,6 @@ function RegistrationComponent() {
     );
   }
 
-  // ถ้ายังไม่มีโปรไฟล์ในระบบ ให้ส่งไปตั้งค่าก่อน
   if (!studentDbProfile) {
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8">
@@ -123,7 +125,6 @@ function RegistrationComponent() {
     );
   }
 
-  // 4. ถ้าทุกอย่างพร้อม (มีโปรไฟล์ และยังไม่เคยลงทะเบียน) ให้แสดงหน้ายืนยัน
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">

@@ -80,9 +80,7 @@ export default function RegisterLiffPage() {
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h1>ระบบลงทะเบียน</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-            <Image 
-            src={userProfile.pictureUrl} 
-            alt={userProfile.displayName}
+            <Image  src={userProfile.pictureUrl}  alt={userProfile.displayName} 
             width={64} // Specify width
             height={64} // Specify height
             className="w-16 h-16 rounded-full border-2 border-white"

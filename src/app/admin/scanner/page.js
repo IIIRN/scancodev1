@@ -7,38 +7,30 @@ import {
   doc, getDoc, updateDoc, addDoc, collection, 
   serverTimestamp, query, where, getDocs 
 } from 'firebase/firestore';
+// 👇 1. Import ฟังก์ชันสำหรับสร้าง Flex Message เข้ามา
+import { createCheckInSuccessFlex } from '../../../lib/flexMessageTemplates';
 
-// Helper component for the Camera Icon
+
+// ... (ส่วน CameraIcon และ State อื่นๆ ไม่เปลี่ยนแปลง) ...
 const CameraIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
     </svg>
 );
 
+
 export default function AdminScannerPage() {
-  // State for toggling between scanning and manual search
   const [mode, setMode] = useState('scan'); 
-  
-  // States for the manual search form
   const [activities, setActivities] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState('');
   const [nationalIdInput, setNationalIdInput] = useState('');
-
-  // State machine to control the UI flow: 'idle', 'scanning', 'found', 'submitting'
   const [scannerState, setScannerState] = useState('idle'); 
-
-  // States for displaying data after a successful find
   const [registrationData, setRegistrationData] = useState(null);
   const [activityName, setActivityName] = useState('');
   const [seatNumberInput, setSeatNumberInput] = useState('');
-  
-  // General UI states
   const [message, setMessage] = useState('');
-  
-  // Ref to hold the html5-qrcode instance
   const qrScannerRef = useRef(null);
 
-  // Initialize the scanner instance once
   useEffect(() => {
     qrScannerRef.current = new Html5Qrcode("reader");
     return () => {
@@ -48,7 +40,6 @@ export default function AdminScannerPage() {
     };
   }, []);
   
-  // Fetch activities for the manual search dropdown
   useEffect(() => {
     const fetchActivities = async () => {
       const activitiesSnapshot = await getDocs(collection(db, 'activities'));
@@ -58,7 +49,7 @@ export default function AdminScannerPage() {
     fetchActivities();
   }, []);
 
-  // Start the camera for scanning
+  // ... (ฟังก์ชัน handleStartScanner, handleScanSuccess, handleSearchById, processFoundRegistration ไม่เปลี่ยนแปลง) ...
   const handleStartScanner = async () => {
     if (!qrScannerRef.current) return;
     resetState();
@@ -80,8 +71,6 @@ export default function AdminScannerPage() {
       setScannerState('idle');
     }
   };
-
-  // Callback for a successful QR scan
   const handleScanSuccess = async (decodedText) => {
     if (scannerState === 'found' || scannerState === 'submitting') return;
     
@@ -105,8 +94,6 @@ export default function AdminScannerPage() {
       setTimeout(() => { resetState(); setScannerState('idle'); }, 3000);
     }
   };
-
-  // Handler for the manual ID search form
   const handleSearchById = async (e) => {
     e.preventDefault();
     if (!selectedActivity || !nationalIdInput) {
@@ -132,8 +119,6 @@ export default function AdminScannerPage() {
       setTimeout(() => setMessage(''), 3000);
     }
   };
-
-  // Shared function to process data once a registration is found
   const processFoundRegistration = async (regData) => {
     setRegistrationData(regData);
     const actRef = doc(db, 'activities', regData.activityId);
@@ -143,8 +128,7 @@ export default function AdminScannerPage() {
     setScannerState('found');
     setMessage('');
   };
-  
-  // Handler to confirm check-in, save seat, send notification, and log the event
+
   const handleConfirmCheckIn = async (e) => {
     e.preventDefault();
     if (!registrationData || !seatNumberInput.trim()) {
@@ -167,11 +151,17 @@ export default function AdminScannerPage() {
       await addDoc(collection(db, 'checkInLogs'), logData);
       
       if (registrationData.lineUserId) {
-          const notificationMessage = `เช็คอินกิจกรรม "${activityName}" สำเร็จ!\nคุณได้รับที่นั่งหมายเลข: ${seatNumberInput.trim()}`;
+          // 👇 2. เรียกใช้ฟังก์ชันเพื่อสร้าง Flex Message
+          const flexMessage = createCheckInSuccessFlex({
+            activityName: activityName,
+            fullName: registrationData.fullName,
+            seatNumber: seatNumberInput.trim(),
+          });
+
           await fetch('/api/send-notification', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: registrationData.lineUserId, message: notificationMessage })
+              body: JSON.stringify({ userId: registrationData.lineUserId, flexMessage: flexMessage })
           });
       }
 
@@ -186,7 +176,7 @@ export default function AdminScannerPage() {
     }
   };
   
-  // Resets all states for the next student
+ // ... (ส่วนที่เหลือของ Component ไม่มีการเปลี่ยนแปลง) ...
   const resetState = () => {
     setRegistrationData(null);
     setActivityName('');
@@ -194,7 +184,6 @@ export default function AdminScannerPage() {
     setMessage('');
     if (mode === 'manual') setNationalIdInput('');
   };
-
   const StatusBadge = ({ status }) => {
     const isCheckedIn = status === 'checked-in';
     const bgColor = isCheckedIn ? 'bg-green-500' : 'bg-yellow-500';
