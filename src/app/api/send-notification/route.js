@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
-  // 👇 1. เปลี่ยนจากการรับ seatNumber มารับ message โดยตรง
-  const { userId, message } = await request.json(); 
+  // 👇 1. เปลี่ยนจากการรับ `message` มาเป็น `flexMessage` ให้ตรงกัน
+  const { userId, flexMessage } = await request.json(); 
   const accessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-  if (!userId || !message || !accessToken) {
+  // 👇 2. ตรวจสอบพารามิเตอร์ `flexMessage` แทน
+  if (!userId || !flexMessage || !accessToken) {
     return NextResponse.json(
-      { message: 'Missing required parameters: userId, message, or Access Token' },
+      { message: 'Missing required parameters: userId, flexMessage, or Access Token' },
       { status: 400 }
     );
   }
@@ -23,15 +24,19 @@ export async function POST(request) {
         to: userId,
         messages: [
           {
-            type: 'text',
-            text: message, // 👈 2. ใช้ข้อความที่ได้รับมาโดยตรง
+            // 👇 3. เปลี่ยน type เป็น 'flex' และส่ง flexMessage ที่ได้รับมา
+            type: 'flex',
+            altText: 'คุณได้รับการแจ้งเตือนใหม่', // ข้อความสำหรับแสดงบน notification และหน้าแชท
+            contents: flexMessage, 
           },
         ],
       }),
     });
 
     const result = await response.json();
+
     if (!response.ok) {
+      console.error('LINE API Error:', result);
       throw new Error(result.message || 'Failed to send message to LINE API');
     }
 

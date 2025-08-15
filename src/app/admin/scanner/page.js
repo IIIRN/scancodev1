@@ -7,17 +7,13 @@ import {
   doc, getDoc, updateDoc, addDoc, collection, 
   serverTimestamp, query, where, getDocs 
 } from 'firebase/firestore';
-// 👇 1. Import ฟังก์ชันสำหรับสร้าง Flex Message เข้ามา
 import { createCheckInSuccessFlex } from '../../../lib/flexMessageTemplates';
 
-
-// ... (ส่วน CameraIcon และ State อื่นๆ ไม่เปลี่ยนแปลง) ...
 const CameraIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
     </svg>
 );
-
 
 export default function AdminScannerPage() {
   const [mode, setMode] = useState('scan'); 
@@ -26,7 +22,8 @@ export default function AdminScannerPage() {
   const [nationalIdInput, setNationalIdInput] = useState('');
   const [scannerState, setScannerState] = useState('idle'); 
   const [registrationData, setRegistrationData] = useState(null);
-  const [activityName, setActivityName] = useState('');
+  const [activityData, setActivityData] = useState(null);
+  const [courseName, setCourseName] = useState('');
   const [seatNumberInput, setSeatNumberInput] = useState('');
   const [message, setMessage] = useState('');
   const qrScannerRef = useRef(null);
@@ -49,17 +46,16 @@ export default function AdminScannerPage() {
     fetchActivities();
   }, []);
 
-  // ... (ฟังก์ชัน handleStartScanner, handleScanSuccess, handleSearchById, processFoundRegistration ไม่เปลี่ยนแปลง) ...
   const handleStartScanner = async () => {
     if (!qrScannerRef.current) return;
     resetState();
     setScannerState('scanning');
     try {
       await qrScannerRef.current.start(
-        { facingMode: "environment" }, // Prioritize rear camera
+        { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         handleScanSuccess,
-        () => {} // Optional error callback, left empty
+        () => {}
       );
     } catch (err) {
       console.error("Failed to start scanner", err);
@@ -71,6 +67,7 @@ export default function AdminScannerPage() {
       setScannerState('idle');
     }
   };
+
   const handleScanSuccess = async (decodedText) => {
     if (scannerState === 'found' || scannerState === 'submitting') return;
     
@@ -94,6 +91,7 @@ export default function AdminScannerPage() {
       setTimeout(() => { resetState(); setScannerState('idle'); }, 3000);
     }
   };
+
   const handleSearchById = async (e) => {
     e.preventDefault();
     if (!selectedActivity || !nationalIdInput) {
@@ -115,15 +113,27 @@ export default function AdminScannerPage() {
       await processFoundRegistration({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
     } catch (err) {
       setMessage(`❌ ${err.message}`);
-      setScannerState('idle'); // Go back to idle if search fails
+      setScannerState('idle');
       setTimeout(() => setMessage(''), 3000);
     }
   };
+
   const processFoundRegistration = async (regData) => {
     setRegistrationData(regData);
     const actRef = doc(db, 'activities', regData.activityId);
     const actSnap = await getDoc(actRef);
-    if (actSnap.exists()) setActivityName(actSnap.data().name);
+    if (actSnap.exists()) {
+        const actData = actSnap.data();
+        setActivityData(actData);
+        
+        if (actData.courseId) {
+            const courseRef = doc(db, 'courses', actData.courseId);
+            const courseSnap = await getDoc(courseRef);
+            if(courseSnap.exists()) {
+                setCourseName(courseSnap.data().name);
+            }
+        }
+    }
     
     setScannerState('found');
     setMessage('');
@@ -144,17 +154,17 @@ export default function AdminScannerPage() {
         adminId: 'Admin_01',
         registrationId: registrationData.id,
         studentName: registrationData.fullName,
-        activityName: activityName,
+        activityName: activityData.name,
         assignedSeat: seatNumberInput.trim(),
         timestamp: serverTimestamp()
       };
       await addDoc(collection(db, 'checkInLogs'), logData);
       
       if (registrationData.lineUserId) {
-          // 👇 2. เรียกใช้ฟังก์ชันเพื่อสร้าง Flex Message
           const flexMessage = createCheckInSuccessFlex({
-            activityName: activityName,
+            courseName: courseName,
             fullName: registrationData.fullName,
+            studentId: registrationData.studentId,
             seatNumber: seatNumberInput.trim(),
           });
 
@@ -176,14 +186,15 @@ export default function AdminScannerPage() {
     }
   };
   
- // ... (ส่วนที่เหลือของ Component ไม่มีการเปลี่ยนแปลง) ...
   const resetState = () => {
     setRegistrationData(null);
-    setActivityName('');
+    setActivityData(null);
+    setCourseName('');
     setSeatNumberInput('');
     setMessage('');
     if (mode === 'manual') setNationalIdInput('');
   };
+
   const StatusBadge = ({ status }) => {
     const isCheckedIn = status === 'checked-in';
     const bgColor = isCheckedIn ? 'bg-green-500' : 'bg-yellow-500';
@@ -204,7 +215,6 @@ export default function AdminScannerPage() {
             </button>
         </div>
 
-        {/* --- Scan Mode UI --- */}
         {mode === 'scan' && (
           <div className="w-full flex flex-col items-center">
             {scannerState === 'idle' && (
@@ -218,7 +228,6 @@ export default function AdminScannerPage() {
           </div>
         )}
         
-        {/* --- Manual Search Mode UI --- */}
         {mode === 'manual' && scannerState === 'idle' && (
             <form onSubmit={handleSearchById} className="w-full space-y-4 animate-fade-in">
               <div>
@@ -238,13 +247,12 @@ export default function AdminScannerPage() {
             </form>
         )}
 
-        {/* --- UI for Found/Submitting State (Shared by both modes) --- */}
         {(scannerState === 'found' || scannerState === 'submitting') && registrationData && (
           <div className="w-full animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">ข้อมูลผู้ลงทะเบียน</h2>
             <div className="space-y-2 text-gray-700 bg-gray-50 p-4 rounded-lg border">
               <p><strong>ชื่อ-สกุล:</strong> {registrationData.fullName}</p>
-              <p><strong>กิจกรรม:</strong> {activityName}</p>
+              <p><strong>กิจกรรม:</strong> {activityData?.name}</p>
               <p className="flex items-center gap-2"><strong>สถานะ:</strong> <StatusBadge status={registrationData.status} /></p>
             </div>
             <hr className="my-4"/>

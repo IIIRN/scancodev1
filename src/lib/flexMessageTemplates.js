@@ -1,92 +1,151 @@
 // src/lib/flexMessageTemplates.js
 
 /**
- * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อเช็คอินสำเร็จ
+ * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อเช็คอินสำเร็จ (อัปเดตตามตัวอย่าง)
  * @param {object} data - ข้อมูลสำหรับแสดงผล
+ * @param {string} data.courseName - ชื่อหลักสูตร
  * @param {string} data.activityName - ชื่อกิจกรรม
  * @param {string} data.fullName - ชื่อเต็มของนักเรียน
+ * @param {string} data.studentId - รหัสนักศึกษา
  * @param {string} data.seatNumber - เลขที่นั่ง
  * @returns {object} - JSON Object ของ Flex Message
  */
-export const createCheckInSuccessFlex = ({ activityName, fullName, seatNumber }) => ({
+export const createCheckInSuccessFlex = ({ courseName, activityName, fullName, studentId, seatNumber }) => ({
   type: "bubble",
   header: {
     type: "box",
-    layout: "vertical",
-    backgroundColor: "#1E3A8A",
+    layout: "horizontal",
     contents: [
-      { type: "text", text: "CHECK-IN SUCCESSFUL", color: "#FFFFFF", weight: "bold", size: "lg", align: "center" }
-    ]
+     
+      {
+        type: "text",
+        text: "ยืนยันการเข้าร่วมกิจกรรม",
+        weight: "bold",
+        color: "#4A4A4A",
+        gravity: "center",
+        margin: "md",
+        size: "md"
+      }
+    ],
+    paddingAll: "15px",
+    backgroundColor: "#FAFAFA"
   },
   body: {
     type: "box",
     layout: "vertical",
     spacing: "md",
     contents: [
-      { type: "text", text: "เช็คอินกิจกรรมสำเร็จ!", weight: "bold", size: "xl", align: "center", wrap: true },
+      { type: "text", text: "หลักสูตร", size: "sm", color: "#AAAAAA" },
+      { type: "text", text: courseName || "-", weight: "bold", size: "md", margin: "none", wrap: true },
+      { type: "text", text: "กิจกรรม", size: "sm", color: "#AAAAAA", margin: "md" },
+      { type: "text", text: activityName || "-", weight: "bold", size: "md", margin: "none", wrap: true },
       { type: "separator", margin: "lg" },
       {
         type: "box",
         layout: "vertical",
         margin: "lg",
-        spacing: "sm",
+        spacing: "md",
         contents: [
-          { type: "box", layout: "baseline", contents: [ { type: "text", text: "กิจกรรม", color: "#aaaaaa", size: "sm", flex: 3 }, { type: "text", text: activityName, wrap: true, color: "#666666", size: "sm", flex: 5 } ] },
-          { type: "box", layout: "baseline", contents: [ { type: "text", text: "ชื่อ", color: "#aaaaaa", size: "sm", flex: 3 }, { type: "text", text: fullName, wrap: true, color: "#666666", size: "sm", flex: 5 } ] },
-          { type: "box", layout: "baseline", contents: [ { type: "text", text: "ที่นั่ง", color: "#aaaaaa", size: "sm", flex: 3 }, { type: "text", text: seatNumber, wrap: true, color: "#111111", size: "lg", weight: "bold", flex: 5 } ] }
+          {
+            type: "box",
+            layout: "baseline",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "ชื่อ", color: "#AAAAAA", size: "sm", flex: 3 },
+              { type: "text", text: fullName || "-", wrap: true, color: "#666666", size: "sm", flex: 5 }
+            ]
+          },
+          {
+            type: "box",
+            layout: "baseline",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "รหัสนักศึกษา", color: "#AAAAAA", size: "sm", flex: 3 },
+              { type: "text", text: studentId || "-", wrap: true, color: "#666666", size: "sm", flex: 5 }
+            ]
+          }
         ]
       }
     ]
+  },
+  footer: {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      { type: "text", text: "เลขที่นั่ง", color: "#E6E6FA" },
+      { type: "text", text: seatNumber || "-", size: "4xl", weight: "bold", color: "#FFFFFF" }
+    ],
+    backgroundColor: "#283593",
+    alignItems: "center",
+    paddingAll: "20px"
   }
 });
 
 /**
- * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อลงทะเบียนสำเร็จ
+ * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อลงทะเบียนสำเร็จ (อัปเดตตามตัวอย่าง)
  * @param {object} data - ข้อมูลสำหรับแสดงผล
+ * @param {string} data.courseName - ชื่อหลักสูตร
  * @param {string} data.activityName - ชื่อกิจกรรม
  * @param {string} data.fullName - ชื่อเต็มของนักเรียน
+ * @param {string} data.studentId - รหัสนักศึกษา
  * @returns {object} - JSON Object ของ Flex Message
  */
-export const createRegistrationSuccessFlex = ({ activityName, fullName }) => ({
-    type: "bubble",
-    header: {
-      type: "box",
-      layout: "vertical",
-      backgroundColor: "#22C55E",
-      contents: [
-        { type: "text", text: "REGISTERED", color: "#FFFFFF", weight: "bold", size: "lg", align: "center" }
-      ]
-    },
-    body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "md",
-      contents: [
-        { type: "text", text: "ลงทะเบียนสำเร็จ!", weight: "bold", size: "xl", align: "center", wrap: true },
-        { type: "text", text: "คุณได้ลงทะเบียนเข้าร่วมกิจกรรมเรียบร้อยแล้ว", align: "center", wrap: true, size: "sm", color: "#666666" },
-        { type: "separator", margin: "lg" },
-        {
-          type: "box",
-          layout: "vertical",
-          margin: "lg",
-          spacing: "sm",
-          contents: [
-            { type: "box", layout: "baseline", contents: [ { type: "text", text: "กิจกรรม", color: "#aaaaaa", size: "sm", flex: 3 }, { type: "text", text: activityName || '', wrap: true, color: "#666666", size: "sm", flex: 5 } ] },
-            { type: "box", layout: "baseline", contents: [ { type: "text", text: "ชื่อ", color: "#aaaaaa", size: "sm", flex: 3 }, { type: "text", text: fullName, wrap: true, color: "#666666", size: "sm", flex: 5 } ] }
-          ]
-        }
-      ]
-    },
-    footer: {
+export const createRegistrationSuccessFlex = ({ courseName, activityName, fullName, studentId }) => ({
+  type: "bubble",
+  header: {
+    type: "box",
+    layout: "horizontal",
+    contents: [
+    
+      {
+        type: "text",
+        text: "ลงทะเบียนกิจกรรมสำเร็จ",
+        weight: "bold",
+        color: "#283593",
+        gravity: "center",
+        margin: "md",
+        size: "md"
+      }
+    ],
+    paddingAll: "15px",
+    backgroundColor: "#FAFAFA" 
+  },
+  body: {
+    type: "box",
+    layout: "vertical",
+    spacing: "md",
+    contents: [
+      { type: "text", text: "หลักสูตร", size: "sm", color: "#AAAAAA" },
+      { type: "text", text: courseName || "-", weight: "bold", size: "md", margin: "none", wrap: true },
+      { type: "text", text: "กิจกรรม", size: "sm", color: "#AAAAAA", margin: "md" },
+      { type: "text", text: activityName || "-", weight: "bold", size: "md", margin: "none", wrap: true },
+      { type: "separator", margin: "lg" },
+      {
         type: "box",
         layout: "vertical",
+        margin: "lg",
+        spacing: "md",
         contents: [
-            {
-                type: "button",
-                action: { type: "uri", label: "ดูการลงทะเบียนทั้งหมด", uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}/student/my-registrations` },
-                style: "primary",
-                color: "#1E40AF"
-            }
+          {
+            type: "box",
+            layout: "baseline",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "ชื่อ", color: "#AAAAAA", size: "sm", flex: 3 },
+              { type: "text", text: fullName || "-", wrap: true, color: "#666666", size: "sm", flex: 5 }
+            ]
+          },
+          {
+            type: "box",
+            layout: "baseline",
+            spacing: "sm",
+            contents: [
+              { type: "text", text: "รหัสนักศึกษา", color: "#AAAAAA", size: "sm", flex: 3 },
+              { type: "text", text: studentId || "-", wrap: true, color: "#666666", size: "sm", flex: 5 }
+            ]
+          }
         ]
-    }
+      }
+    ]
+  }
 });

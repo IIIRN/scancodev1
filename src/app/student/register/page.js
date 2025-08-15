@@ -7,16 +7,15 @@ import { collection, addDoc, query, where, serverTimestamp, doc, getDoc, getDocs
 import { QRCodeSVG } from 'qrcode.react';
 import useLiff from '../../../hooks/useLiff';
 import Link from 'next/link';
-// 👇 1. Import ฟังก์ชันสำหรับสร้าง Flex Message เข้ามา
 import { createRegistrationSuccessFlex } from '../../../lib/flexMessageTemplates';
 
-// ... (ส่วน RegistrationComponent) ...
 function RegistrationComponent() {
   const { liffProfile, studentDbProfile, isLoading, error } = useLiff();
   const searchParams = useSearchParams();
   const activityIdFromUrl = searchParams.get('activityId');
 
   const [activity, setActivity] = useState(null);
+  const [courseName, setCourseName] = useState('');
   const [registration, setRegistration] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -24,10 +23,18 @@ function RegistrationComponent() {
   useEffect(() => {
     if (!liffProfile || !activityIdFromUrl) return;
 
-    const fetchActivity = async () => {
+    const fetchActivityAndCourse = async () => {
       const activityDoc = await getDoc(doc(db, 'activities', activityIdFromUrl));
       if (activityDoc.exists()) {
-        setActivity({ id: activityDoc.id, ...activityDoc.data() });
+        const actData = activityDoc.data();
+        setActivity({ id: activityDoc.id, ...actData });
+
+        if(actData.courseId) {
+            const courseDoc = await getDoc(doc(db, 'courses', actData.courseId));
+            if(courseDoc.exists()) {
+                setCourseName(courseDoc.data().name);
+            }
+        }
       }
     };
 
@@ -43,7 +50,7 @@ function RegistrationComponent() {
       }
     };
 
-    fetchActivity();
+    fetchActivityAndCourse();
     checkExistingRegistration();
   }, [liffProfile, activityIdFromUrl]);
 
@@ -72,10 +79,10 @@ function RegistrationComponent() {
     try {
       const docRef = await addDoc(collection(db, 'registrations'), registrationData);
       
-      // 👇 2. เรียกใช้ฟังก์ชันเพื่อสร้าง Flex Message
       const flexMessage = createRegistrationSuccessFlex({
-          activityName: activity?.name,
-          fullName: studentDbProfile.fullName
+          courseName: courseName,
+          fullName: studentDbProfile.fullName,
+          studentId: studentDbProfile.studentId
       });
 
       await fetch('/api/send-notification', {
@@ -93,7 +100,6 @@ function RegistrationComponent() {
     }
   };
 
-  // ... (ส่วนที่เหลือของ Component ไม่มีการเปลี่ยนแปลง) ...
   if (isLoading) return <div className="text-center p-10">กำลังโหลด...</div>;
   if (error) return <div className="p-4 text-center text-red-600 bg-red-100">{error}</div>;
 
@@ -147,7 +153,6 @@ function RegistrationComponent() {
   );
 }
 
-// Component หลักที่ครอบด้วย Suspense (เหมือนเดิม)
 export default function LiffStudentRegistrationPage() {
   return (
     <Suspense fallback={<div className="flex justify-center items-center h-screen">กำลังโหลด...</div>}>
