@@ -120,6 +120,11 @@ export default function AdminScannerPage() {
 
   const processFoundRegistration = async (regData) => {
     setRegistrationData(regData);
+
+    if (regData.seatNumber) {
+        setSeatNumberInput(regData.seatNumber);
+    }
+
     const actRef = doc(db, 'activities', regData.activityId);
     const actSnap = await getDoc(actRef);
     if (actSnap.exists()) {
@@ -148,7 +153,11 @@ export default function AdminScannerPage() {
     setMessage('กำลังบันทึกข้อมูล...');
     try {
       const regRef = doc(db, 'registrations', registrationData.id);
-      await updateDoc(regRef, { status: 'checked-in', seatNumber: seatNumberInput.trim() });
+      // อัปเดต status และ seatNumber พร้อมกันเสมอ
+      await updateDoc(regRef, { 
+        status: 'checked-in', 
+        seatNumber: seatNumberInput.trim() 
+      });
       
       const logData = {
         adminId: 'Admin_01',
@@ -176,7 +185,7 @@ export default function AdminScannerPage() {
           });
       }
 
-      setMessage(`✅ เช็คอินสำเร็จ! ที่นั่ง ${seatNumberInput.trim()}`);
+      setMessage(`✅ ยืนยันสำเร็จ! ที่นั่ง ${seatNumberInput.trim()}`);
       setTimeout(() => {
         resetState();
         setScannerState('idle');
@@ -205,13 +214,12 @@ export default function AdminScannerPage() {
   return (
     <div className="max-w-xl mx-auto p-4 md:p-8 font-sans">
       <div className="bg-white p-6 rounded-lg shadow-2xl min-h-[500px] flex flex-col items-center">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">เช็คอินนักเรียน</h1>
 
         <div className="flex justify-center border border-gray-300 rounded-lg p-1 bg-gray-100 mb-6 w-full">
-            <button onClick={() => { setMode('scan'); resetState(); setScannerState('idle'); }} className={`w-1/2 py-2 rounded-md transition-colors ${mode === 'scan' ? 'bg-blue-600 text-white shadow' : 'text-gray-600'}`}>
+            <button onClick={() => { setMode('scan'); resetState(); setScannerState('idle'); }} className={`w-1/2 py-2 rounded-md transition-colors ${mode === 'scan' ? 'bg-primary text-white shadow' : 'text-gray-600'}`}>
               สแกน QR Code
             </button>
-            <button onClick={() => { setMode('manual'); resetState(); setScannerState('idle'); }} className={`w-1/2 py-2 rounded-md transition-colors ${mode === 'manual' ? 'bg-blue-600 text-white shadow' : 'text-gray-600'}`}>
+            <button onClick={() => { setMode('manual'); resetState(); setScannerState('idle'); }} className={`w-1/2 py-2 rounded-md transition-colors ${mode === 'manual' ? 'bg-primary text-white shadow' : 'text-gray-600'}`}>
               ค้นหาด้วยตนเอง
             </button>
         </div>
@@ -219,7 +227,7 @@ export default function AdminScannerPage() {
         {mode === 'scan' && (
           <div className="w-full flex flex-col items-center">
             {scannerState === 'idle' && (
-              <button onClick={handleStartScanner} className="flex flex-col items-center text-blue-600 hover:text-blue-800 transition-colors">
+              <button onClick={handleStartScanner} className="flex flex-col items-center text-primary hover:text-blue-800 transition-colors">
                 <CameraIcon />
                 <span className="text-xl font-semibold">เริ่มสแกน</span>
               </button>
@@ -248,6 +256,7 @@ export default function AdminScannerPage() {
             </form>
         )}
 
+        {/* 👇 **การเปลี่ยนแปลง**: ลบเงื่อนไข && registrationData.status !== 'checked-in' ออก */}
         {(scannerState === 'found' || scannerState === 'submitting') && registrationData && (
           <div className="w-full animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">ข้อมูลผู้ลงทะเบียน</h2>
@@ -257,17 +266,27 @@ export default function AdminScannerPage() {
               <p className="flex items-center gap-2"><strong>สถานะ:</strong> <StatusBadge status={registrationData.status} /></p>
             </div>
             <hr className="my-4"/>
-            {registrationData.status !== 'checked-in' ? (
-              <form onSubmit={handleConfirmCheckIn} className="space-y-3">
-                <label htmlFor="seatNumber" className="block text-sm font-medium text-gray-700">กำหนดเลขที่นั่ง</label>
-                <input type="text" id="seatNumber" value={seatNumberInput} onChange={(e) => setSeatNumberInput(e.target.value)} required placeholder="เช่น A1, B12" className="w-full p-2 border border-gray-300 rounded-md" />
-                <button type="submit" disabled={scannerState === 'submitting'} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-300">
-                  {scannerState === 'submitting' ? 'กำลังดำเนินการ...' : 'ยืนยันการเข้าเรียน'}
-                </button>
-              </form>
-            ) : (
-              <p className="text-center font-semibold text-green-600">นักเรียนคนนี้ได้เช็คอินเรียบร้อยแล้ว (ที่นั่ง: {registrationData.seatNumber})</p>
-            )}
+            <form onSubmit={handleConfirmCheckIn} className="space-y-3">
+              <label htmlFor="seatNumber" className="block text-sm font-medium text-gray-700">
+                กำหนด/แก้ไขเลขที่นั่ง
+              </label>
+              <input 
+                type="text" 
+                id="seatNumber" 
+                value={seatNumberInput} 
+                onChange={(e) => setSeatNumberInput(e.target.value)} 
+                required 
+                placeholder="เช่น A1, B12" 
+                className="w-full p-2 border border-gray-300 rounded-md" 
+              />
+              <button 
+                type="submit" 
+                disabled={scannerState === 'submitting'} 
+                className="w-full py-3 bg-primary text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-300"
+              >
+                {scannerState === 'submitting' ? 'กำลังดำเนินการ...' : 'ยืนยัน / อัปเดตข้อมูล'}
+              </button>
+            </form>
           </div>
         )}
 

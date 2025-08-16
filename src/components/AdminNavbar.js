@@ -16,7 +16,7 @@ export default function AdminNavbar() {
   ];
 
   return (
-    <nav className="bg-gray-800 shadow-lg">
+    <nav className="bg-primary shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* ส่วนของโลโก้หรือชื่อระบบ */}
@@ -32,7 +32,7 @@ export default function AdminNavbar() {
               {navLinks.map((link) => {
                 const isActive = pathname.startsWith(link.href);
                 return (
-                  <Link key={link.name} href={link.href} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${isActive ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
+                  <Link key={link.name} href={link.href} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${isActive ? 'bg-card text-white' : 'text-gray-300 hover:bg-card hover:text-white'}`}>
                     {link.name}
                   </Link>
                 );

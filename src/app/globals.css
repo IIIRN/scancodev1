@@ -3,10 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --primary: #110D42;
+  --primary: #0b0084;
   --primary-hover: #2718c5;
-  --card: #f7f7f7;
-  --border: #e6e6e6;
+  --card: #eb8012;
+  --border: #eb8012;
 
 }
 
@@ -15,8 +15,8 @@
   :root {
     --background: #ffffff;
     --foreground: #171717;
-    --card: #f7f7f7;
-    --border: #e6e6e6;
+    --card: #eb8012;
+    --border: #eb8012;
   }
 }
 

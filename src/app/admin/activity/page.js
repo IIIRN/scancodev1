@@ -139,9 +139,9 @@ export default function ActivityDashboardPage() {
       <div className="bg-gray-100 min-h-screen p-4 md:p-8">
         <main className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">Activity Management</h1>
-            <Link href="/admin/activity/add" className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
-              + Create New Activity
+            <h1 className="text-3xl font-bold text-gray-800">จัดการ หลักสูตร กิจกรรม</h1>
+            <Link href="/admin/activity/add" className="px-4 py-2 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
+              + เพิ่มกิจกรรม
             </Link>
           </div>
           <div className="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -163,7 +163,7 @@ export default function ActivityDashboardPage() {
                       <td className="p-4 text-gray-600">{courses[activity.courseId] || 'N/A'}</td>
                       <td className="p-4 text-center font-mono">{count} / {activity.capacity}</td>
                       <td className="p-4 text-right space-x-2 whitespace-nowrap">
-                        <Link href={`/admin/activity/seats/${activity.id}`} className="px-3 py-1 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700">
+                        <Link href={`/admin/activity/seats/${activity.id}`} className="px-3 py-1 bg-card text-white text-sm rounded-md hover:bg-purple-700">
                           ข้อมูล
                         </Link>
                         <Link href={`/admin/activity/edit/${activity.id}`} className="px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">

@@ -53,7 +53,7 @@ export default function StudentHeader() {
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
-                <Link key={link.name} href={link.href} className={`w-1/2 text-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${isActive ? 'bg-white text-blue-700 shadow' : 'text-white/80 hover:bg-white/10'}`}>
+                <Link key={link.name} href={link.href} className={`w-1/2 text-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${isActive ? 'bg-white text-primary shadow' : 'text-white/80 hover:bg-white/10'}`}>
                   {link.name}
                 </Link>
               );
