@@ -25,7 +25,7 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
     
     const profileData = { 
       fullName: fullName.trim(), 
-      studentId: studentId.trim(), 
+      studentId: studentId.trim() || null, // ให้เป็น null หากไม่กรอก
       nationalId: nationalId.trim(), 
       createdAt: serverTimestamp() 
     };
@@ -56,17 +56,17 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
             <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="mt-1 w-full p-3 border border-gray-300 rounded-md" placeholder="กรุณากรอกชื่อและนามสกุล"/>
           </div>
           <div>
-            <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">รหัสนักศึกษา</label>
-            <input id="studentId" type="text" value={studentId} onChange={(e) => setStudentId(e.target.value)} required className="mt-1 w-full p-3 border border-gray-300 rounded-md"placeholder="กรุณากรอกรหัสนักศึกษา"/>
+            <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">รหัสนักศึกษา (ไม่บังคับ)</label>
+            <input id="studentId" type="text" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="mt-1 w-full p-3 border border-gray-300 rounded-md" placeholder="กรุณากรอกรหัสนักศึกษา (หากมี)"/>
           </div>
           <div>
             <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700">เลขบัตรประชาชน (13 หลัก)</label>
-            <input id="nationalId" type="tel" value={nationalId} onChange={(e) => setNationalId(e.target.value)} required pattern="\d{13}" className="mt-1 w-full p-3 border border-gray-300 rounded-md"placeholder="กรุณากรอกเลขบัตรประชาชน"/>
+            <input id="nationalId" type="tel" value={nationalId} onChange={(e) => setNationalId(e.target.value)} required pattern="\d{13}" className="mt-1 w-full p-3 border border-gray-300 rounded-md" placeholder="กรุณากรอกเลขบัตรประชาชน"/>
           </div>
           
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-          <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-primary  text-white font-bold rounded-md hover:bg-primary-hover  transition-colors">
+          <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-primary text-white font-bold rounded-md hover:bg-primary-hover transition-colors">
             {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกและเริ่มต้นใช้งาน'}
           </button>
         </form>

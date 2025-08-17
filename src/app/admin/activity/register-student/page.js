@@ -81,7 +81,7 @@ export default function AdminRegisterStudentPage() {
       // Prepare the data object for Firestore
       const registrationData = {
         fullName: fullName.trim(),
-        studentId: studentId.trim(),
+        studentId: studentId.trim() || null, // Allow empty studentId
         nationalId: nationalId.trim(),
         activityId: selectedActivity,
         courseId: activities.find(act => act.id === selectedActivity)?.courseId || null,
@@ -148,7 +148,7 @@ export default function AdminRegisterStudentPage() {
               <div className="border-t pt-6 space-y-4">
                  <h2 className="text-xl font-semibold text-gray-700">2. กรอกข้อมูลนักเรียน</h2>
                 <input type="text" placeholder="ชื่อ-สกุล" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="w-full p-3 border border-gray-300 rounded-md"/>
-                <input type="text" placeholder="รหัสนักศึกษา" value={studentId} onChange={(e) => setStudentId(e.target.value)} required className="w-full p-3 border border-gray-300 rounded-md"/>
+                <input type="text" placeholder="รหัสนักศึกษา (ไม่บังคับ)" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md"/>
                 <input type="tel" placeholder="เลขบัตรประชาชน (13 หลัก)" value={nationalId} onChange={(e) => setNationalId(e.target.value)} required pattern="\d{13}" className="w-full p-3 border border-gray-300 rounded-md"/>
                 
                 <button type="submit" disabled={isLoading} className="w-full py-3 px-4 bg-purple-600 text-white font-bold rounded-md hover:bg-purple-700 disabled:bg-purple-300 transition-colors">

@@ -20,6 +20,12 @@ export default function SeatAssignmentPage({ params }) {
   const [message, setMessage] = useState('');
   const [savingStates, setSavingStates] = useState({});
   const [isBulkLoading, setIsBulkLoading] = useState(false);
+  const [editingRegistrant, setEditingRegistrant] = useState(null);
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    studentId: '',
+    nationalId: ''
+  });
 
   // Function to fetch the latest data for the page
   const fetchData = useCallback(async () => {
@@ -209,6 +215,67 @@ export default function SeatAssignmentPage({ params }) {
     }
   };
 
+  // Handle edit button click
+  const handleEditClick = (registrant) => {
+    setEditingRegistrant(registrant.id);
+    setEditForm({
+      fullName: registrant.fullName || '',
+      studentId: registrant.studentId || '',
+      nationalId: registrant.nationalId || ''
+    });
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingRegistrant(null);
+    setEditForm({ fullName: '', studentId: '', nationalId: '' });
+  };
+
+  // Handle form input changes
+  const handleEditFormChange = (field, value) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Save edited registrant data
+  const handleSaveEdit = async (registrantId) => {
+    if (!editForm.fullName.trim() || !editForm.studentId.trim() || !editForm.nationalId.trim()) {
+      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    setSavingStates(prev => ({ ...prev, [registrantId]: true }));
+    try {
+      const registrantDocRef = doc(db, 'registrations', registrantId);
+      await updateDoc(registrantDocRef, {
+        fullName: editForm.fullName.trim(),
+        studentId: editForm.studentId.trim(),
+        nationalId: editForm.nationalId.trim()
+      });
+
+      // Update local state
+      setRegistrants(prev => prev.map(r =>
+        r.id === registrantId 
+          ? { 
+              ...r, 
+              fullName: editForm.fullName.trim(),
+              studentId: editForm.studentId.trim(),
+              nationalId: editForm.nationalId.trim()
+            } 
+          : r
+      ));
+
+      setEditingRegistrant(null);
+      setEditForm({ fullName: '', studentId: '', nationalId: '' });
+      setMessage('✅ แก้ไขข้อมูลสำเร็จแล้ว');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error("เกิดข้อผิดพลาดในการแก้ไขข้อมูล:", error);
+      setMessage(`เกิดข้อผิดพลาดในการแก้ไขข้อมูล: ${error.message}`);
+    } finally {
+      setSavingStates(prev => ({ ...prev, [registrantId]: false }));
+    }
+  };
+
   if (isLoading) return <div className="text-center p-10 font-sans">กำลังโหลดข้อมูลผู้เข้าร่วม...</div>;
 
   // Prepare data and headers for CSV export
@@ -267,9 +334,45 @@ export default function SeatAssignmentPage({ params }) {
                 {registrants.map((reg, index) => (
                     <tr key={reg.id} className="border-b hover:bg-gray-50">
                         <td className="p-2">{index + 1}</td>
-                        <td className="p-2 font-medium">{reg.fullName}</td>
-                        <td className="p-2">{reg.studentId}</td>
-                        <td className="p-2">{reg.nationalId}</td>
+                        <td className="p-2 font-medium">
+                            {editingRegistrant === reg.id ? (
+                                <input
+                                    type="text"
+                                    value={editForm.fullName}
+                                    onChange={(e) => handleEditFormChange('fullName', e.target.value)}
+                                    className="p-1 border border-gray-300 rounded w-full"
+                                    placeholder="ชื่อ-สกุล"
+                                />
+                            ) : (
+                                reg.fullName
+                            )}
+                        </td>
+                        <td className="p-2">
+                            {editingRegistrant === reg.id ? (
+                                <input
+                                    type="text"
+                                    value={editForm.studentId}
+                                    onChange={(e) => handleEditFormChange('studentId', e.target.value)}
+                                    className="p-1 border border-gray-300 rounded w-full"
+                                    placeholder="รหัสนักศึกษา"
+                                />
+                            ) : (
+                                reg.studentId
+                            )}
+                        </td>
+                        <td className="p-2">
+                            {editingRegistrant === reg.id ? (
+                                <input
+                                    type="text"
+                                    value={editForm.nationalId}
+                                    onChange={(e) => handleEditFormChange('nationalId', e.target.value)}
+                                    className="p-1 border border-gray-300 rounded w-full"
+                                    placeholder="เลขบัตรประชาชน"
+                                />
+                            ) : (
+                                reg.nationalId
+                            )}
+                        </td>
                         <td className="p-2">
                             <span className={`px-2 py-1 text-xs rounded-full ${reg.status === 'checked-in' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                 {reg.status}
@@ -294,12 +397,40 @@ export default function SeatAssignmentPage({ params }) {
                             </div>
                         </td>
                         <td className="p-2">
-                            <button
-                                onClick={() => handleDeleteRegistrant(reg.id, reg.fullName)}
-                                className="text-red-500 hover:text-red-700 text-sm font-semibold"
-                            >
-                                ลบ
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {editingRegistrant === reg.id ? (
+                                    <>
+                                        <button
+                                            onClick={() => handleSaveEdit(reg.id)}
+                                            disabled={savingStates[reg.id]}
+                                            className="text-green-600 hover:text-green-800 text-sm font-semibold"
+                                        >
+                                            {savingStates[reg.id] ? '...' : 'บันทึก'}
+                                        </button>
+                                        <button
+                                            onClick={handleCancelEdit}
+                                            className="text-gray-500 hover:text-gray-700 text-sm font-semibold"
+                                        >
+                                            ยกเลิก
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => handleEditClick(reg)}
+                                            className="text-blue-500 hover:text-blue-700 text-sm font-semibold"
+                                        >
+                                            แก้ไข
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteRegistrant(reg.id, reg.fullName)}
+                                            className="text-red-500 hover:text-red-700 text-sm font-semibold"
+                                        >
+                                            ลบ
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </td>
                     </tr>
                 ))}

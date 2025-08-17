@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../../../lib/firebase';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import useLiff from '../../../hooks/useLiff';
 
 // Helper component for the person icon
 const UsersIcon = () => (
@@ -11,11 +12,13 @@ const UsersIcon = () => (
 );
 
 export default function ActivitiesListPage() {
+  const { liffProfile, studentDbProfile } = useLiff();
   const [activities, setActivities] = useState([]);
   const [courses, setCourses] = useState({});
   const [registrationsCount, setRegistrationsCount] = useState({});
+  const [userRegistrations, setUserRegistrations] = useState(new Set()); // เก็บ ID ของกิจกรรมที่ผู้ใช้ลงทะเบียนแล้ว
   const [isLoading, setIsLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(false); // 👈 1. Add mounted state
+  const [isMounted, setIsMounted] = useState(false);
 
   // This effect runs only on the client after the component mounts
   useEffect(() => {
@@ -24,7 +27,7 @@ export default function ActivitiesListPage() {
 
   useEffect(() => {
     // Only fetch data on the client side
-    if (!isMounted) return;
+    if (!isMounted || !liffProfile?.userId) return;
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -40,11 +43,24 @@ export default function ActivitiesListPage() {
         setCourses(coursesMap);
 
         const counts = {};
+        const userActivityIds = new Set();
+        
         registrationsSnapshot.forEach(doc => {
-          const activityId = doc.data().activityId;
+          const registration = doc.data();
+          const activityId = registration.activityId;
+          
+          // นับจำนวนการลงทะเบียนทั้งหมด
           counts[activityId] = (counts[activityId] || 0) + 1;
+          
+          // ตรวจสอบว่าผู้ใช้คนนี้ลงทะเบียนกิจกรรมนี้หรือไม่
+          if (registration.lineUserId === liffProfile.userId || 
+              (studentDbProfile?.nationalId && registration.nationalId === studentDbProfile.nationalId)) {
+            userActivityIds.add(activityId);
+          }
         });
+        
         setRegistrationsCount(counts);
+        setUserRegistrations(userActivityIds);
 
         const activitiesList = activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setActivities(activitiesList);
@@ -56,10 +72,9 @@ export default function ActivitiesListPage() {
       }
     };
     fetchData();
-  }, [isMounted]); // 👈 2. Add isMounted as a dependency
+  }, [isMounted, liffProfile?.userId, studentDbProfile?.nationalId]);
 
-  // 👈 3. Don't render anything until mounted on the client
-  // This ensures the server and client render the same initial null state.
+  // Don't render anything until mounted on the client
   if (!isMounted) {
     return null; 
   }
@@ -69,7 +84,7 @@ export default function ActivitiesListPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8">
+    <div className="max-w-4xl mx-auto p-4 md:p-8">
       {activities.length === 0 ? (
         <div className="text-center py-10 px-4 bg-white rounded-lg shadow-md">
             <h2 className="text-xl font-semibold text-gray-700">ไม่มีกิจกรรม</h2>
@@ -82,6 +97,7 @@ export default function ActivitiesListPage() {
             const count = registrationsCount[activity.id] || 0;
             const isFull = count >= activity.capacity;
             const isAlmostFull = !isFull && count / activity.capacity >= 0.9;
+            const isRegistered = userRegistrations.has(activity.id); // ตรวจสอบว่าลงทะเบียนแล้วหรือไม่
 
             return (
               <div key={activity.id} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform hover:scale-105">
@@ -100,21 +116,28 @@ export default function ActivitiesListPage() {
                       {count} / {activity.capacity} registered
                     </span>
                     {isFull && <span className="ml-2 text-xs font-bold text-white bg-red-600 px-2 py-1 rounded-full">FULL</span>}
+                    {isRegistered && <span className="ml-2 text-xs font-bold text-white bg-green-600 px-2 py-1 rounded-full">เข้าร่วมแล้ว</span>}
                   </div>
                 </div>
                 <div className="bg-gray-50 p-4 mt-auto">
-                  <Link 
-                    href={isFull ? '#' : `/student/register?activityId=${activity.id}`} 
-                    className={`w-full text-center block px-4 py-2 font-semibold rounded-lg ${
-                      isFull 
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : 'bg-primary text-white hover:bg-primary-hover'
-                    }`}
-                    aria-disabled={isFull}
-                    onClick={(e) => isFull && e.preventDefault()}
-                  >
-                    {isFull ? 'เต็มแล้ว' : 'ลงทะเบียน'}
-                  </Link>
+                  {isRegistered ? (
+                    <div className="w-full text-center px-4 py-2 font-semibold rounded-lg bg-green-100 text-green-700 border border-green-300">
+                      ✓ เข้าร่วมแล้ว
+                    </div>
+                  ) : (
+                    <Link 
+                      href={isFull ? '#' : `/student/register?activityId=${activity.id}`} 
+                      className={`w-full text-center block px-4 py-2 font-semibold rounded-lg ${
+                        isFull 
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                        : 'bg-primary text-white hover:bg-primary-hover'
+                      }`}
+                      aria-disabled={isFull}
+                      onClick={(e) => isFull && e.preventDefault()}
+                    >
+                      {isFull ? 'เต็มแล้ว' : 'ลงทะเบียน'}
+                    </Link>
+                  )}
                 </div>
               </div>
             );
