@@ -76,5 +76,6 @@ export default function AdminNavbar() {
         </div>
       )}
     </nav>
-  );
+ 
+);
 }

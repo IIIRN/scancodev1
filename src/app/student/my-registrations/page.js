@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '../../../lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, writeBatch, doc } from 'firebase/firestore';
 import useLiff from '../../../hooks/useLiff';
 import { QRCodeSVG } from 'qrcode.react';
 import ProfileSetupForm from '../../../components/student/ProfileSetupForm';
@@ -32,7 +32,6 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr, hasEvaluated }) 
   const course = activity ? courses[activity.courseId] : null;
   if (!activity) return null;
   const activityDate = activity.activityDate?.toDate();
-
   const getStatusDisplay = () => {
       switch(reg.status) {
           case 'checked-in': return <><CheckmarkIcon className="text-green-600" /> <span className="text-green-600">เช็คอินแล้ว</span></>;
@@ -40,7 +39,6 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr, hasEvaluated }) 
           default: return <><CheckmarkIcon className="text-yellow-600" /> <span className="text-yellow-600">ลงทะเบียนแล้ว</span></>;
       }
   }
-
   return (
     <div className="bg-white rounded-xl shadow-lg flex overflow-hidden">
       <div className="flex-none w-32 bg-primary text-white flex flex-col justify-center items-center p-4 text-center">
@@ -88,14 +86,12 @@ export default function MyRegistrationsPage() {
   const { liffProfile, studentDbProfile, isLoading, error, setStudentDbProfile } = useLiff();
   
   const [registrations, setRegistrations] = useState([]);
-  const [unlinkedRegistrations, setUnlinkedRegistrations] = useState([]);
   const [activities, setActivities] = useState({});
   const [courses, setCourses] = useState({});
   const [evaluatedActivities, setEvaluatedActivities] = useState(new Set());
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [visibleQrCodeId, setVisibleQrCodeId] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const fetchBaseData = async () => {
@@ -134,6 +130,27 @@ export default function MyRegistrationsPage() {
         return;
     }
 
+    // Auto-sync unlinked registrations in the background
+    const syncUnlinkedRegistrations = async () => {
+      if (studentDbProfile.nationalId && liffProfile.userId) {
+        const q = query(
+          collection(db, 'registrations'),
+          where('nationalId', '==', studentDbProfile.nationalId),
+          where('lineUserId', '==', null)
+        );
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const batch = writeBatch(db);
+          snapshot.forEach(doc => {
+            batch.update(doc.ref, { lineUserId: liffProfile.userId });
+          });
+          await batch.commit();
+          console.log(`Auto-synced ${snapshot.size} registrations.`);
+        }
+      }
+    };
+    syncUnlinkedRegistrations();
+
     const registrationsRef = collection(db, 'registrations');
     let unsubscribe = () => {};
 
@@ -141,16 +158,12 @@ export default function MyRegistrationsPage() {
 
     unsubscribe = onSnapshot(q, (snapshot) => {
         const allUserRegistrations = [];
-        const unlinked = [];
         snapshot.forEach(doc => {
             const data = doc.data();
             const matchesLineId = liffProfile?.userId && data.lineUserId === liffProfile.userId;
             const matchesNationalId = studentDbProfile?.nationalId && data.nationalId === studentDbProfile.nationalId;
             if (matchesLineId || matchesNationalId) {
                 allUserRegistrations.push({ id: doc.id, ...data });
-                if (matchesNationalId && !data.lineUserId) {
-                    unlinked.push({ id: doc.id, ...data });
-                }
             }
         });
         
@@ -158,27 +171,12 @@ export default function MyRegistrationsPage() {
         allUserRegistrations.forEach(reg => uniqueRegistrations.set(reg.id, reg));
         
         setRegistrations(Array.from(uniqueRegistrations.values()));
-        setUnlinkedRegistrations(unlinked);
     });
 
     return () => unsubscribe();
 
   }, [studentDbProfile, liffProfile, isLoading, isLoadingData]);
-
-  const handleLinkAccount = async () => {
-      if (unlinkedRegistrations.length === 0) return;
-      setMessage("กำลังเชื่อมต่อบัญชี...");
-      const batch = writeBatch(db);
-      unlinkedRegistrations.forEach(reg => {
-          const docRef = doc(db, 'registrations', reg.id);
-          batch.update(docRef, { lineUserId: liffProfile.userId });
-      });
-      await batch.commit();
-      setMessage("✅ เชื่อมต่อบัญชีสำเร็จ!");
-      setUnlinkedRegistrations([]);
-      setTimeout(() => setMessage(''), 3000);
-  };
-
+  
   if (isLoading || isLoadingData) return <div className="text-center p-10 font-sans">กำลังโหลดข้อมูล...</div>;
   if (error) return <div className="p-4 text-center text-red-500 bg-red-100 font-sans">{error}</div>;
 
@@ -226,17 +224,6 @@ export default function MyRegistrationsPage() {
     <div className="max-w-4xl mx-auto p-4 md:p-8">
       {visibleQrCodeId && <QRModal registrationId={visibleQrCodeId} onClose={() => setVisibleQrCodeId(null)} />}
       
-      {unlinkedRegistrations.length > 0 && (
-          <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded-md shadow-lg" role="alert">
-            <p className="font-bold">พบกิจกรรมที่ลงทะเบียนโดยผู้ดูแล</p>
-            <p className="text-sm">เชื่อมต่อบัญชี LINE ของคุณเพื่อรับการแจ้งเตือนและจัดการกิจกรรมได้สะดวกยิ่งขึ้น</p>
-            <button onClick={handleLinkAccount} className="mt-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded hover:bg-blue-600">
-              เชื่อมต่อบัญชี
-            </button>
-          </div>
-      )}
-      {message && <p className="text-center mb-4">{message}</p>}
-
       <div>
         <h2 className="text-xl font-bold text-gray-800 mb-4">กิจกรรมที่กำลังจะมาถึง</h2>
         {upcomingRegistrations.length > 0 ? (
