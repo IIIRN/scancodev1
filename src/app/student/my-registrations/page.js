@@ -5,9 +5,9 @@ import { db } from '../../../lib/firebase';
 import { collection, query, where, getDocs, onSnapshot, writeBatch } from 'firebase/firestore';
 import useLiff from '../../../hooks/useLiff';
 import { QRCodeSVG } from 'qrcode.react';
-import ProfileSetupForm from '../../../components/student/ProfileSetupForm'; // 👈 1. Import ฟอร์มเข้ามา
+import ProfileSetupForm from '../../../components/student/ProfileSetupForm';
 
-// --- Helper Components (defined at the top level for stability) ---
+// --- Helper Components ---
 
 const QRModal = ({ registrationId, onClose }) => (
   <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50" onClick={onClose}>
@@ -23,30 +23,35 @@ const CheckmarkIcon = () => (
   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
 );
 
-// ...existing code...
-
-// ...existing code...
-
 const TicketIcon = () => (
   <svg className="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    {/* เก้าอี้ */}
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" 
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
           d="M5 10V8a2 2 0 012-2h10a2 2 0 012 2v2M5 10h14M5 10v8a1 1 0 001 1h1m0 0v2m0-2h10m0 0v2m0-2h1a1 1 0 001-1v-8" />
   </svg>
 );
-
-// ...existing code...
-// ...existing code...
 
 const RegistrationCard = ({ reg, activities, courses, onShowQr }) => {
   const activity = activities[reg.activityId];
   const course = activity ? courses[activity.courseId] : null;
   if (!activity) return null;
-  const activityDate = activity.activityDate.toDate();
+  const activityDate = activity.activityDate?.toDate(); // Safely call toDate
+
   return (
     <div className="bg-white rounded-xl shadow-lg flex overflow-hidden">
       <div className="flex-none w-32 bg-primary text-white flex flex-col justify-center items-center p-4 text-center">
-        {reg.seatNumber ? (
+        {activity.type === 'queue' ? (
+          reg.queueNumber ? (
+            <>
+              <span className="text-xs opacity-75">คิวของคุณ</span>
+              <span className="text-4xl font-bold tracking-wider">{reg.queueNumber}</span>
+            </>
+          ) : (
+            <>
+              <TicketIcon />
+              <span className="text-xs font-semibold mt-2">รอคิว</span>
+            </>
+          )
+        ) : reg.seatNumber ? (
           <>
             <span className="text-xs opacity-75">เลขที่นั่งของคุณ</span>
             <span className="text-4xl font-bold tracking-wider">{reg.seatNumber}</span>
@@ -74,18 +79,19 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr }) => {
           <h2 className="text-lg font-bold text-gray-800 mt-2">{activity.name}</h2>
           <p className="text-sm text-gray-500">{course?.name || 'หลักสูตรทั่วไป'}</p>
         </div>
-        <div className="bg-gray-100 p-2 text-center text-sm text-gray-600 border-t">
-          {activityDate.toLocaleString('th-TH', { dateStyle: 'full', timeStyle: 'short' })} น.
-        </div>
+        {activityDate && (
+            <div className="bg-gray-100 p-2 text-center text-sm text-gray-600 border-t">
+                {activityDate.toLocaleString('th-TH', { dateStyle: 'full', timeStyle: 'short' })} น.
+            </div>
+        )}
       </div>
     </div>
   );
 };
 
 
-// --- Main Page Component ---
 export default function MyRegistrationsPage() {
-  const { liffProfile, studentDbProfile, isLoading, error, setStudentDbProfile } = useLiff(); // 👈 2. ดึง setStudentDbProfile มาใช้
+  const { liffProfile, studentDbProfile, isLoading, error, setStudentDbProfile } = useLiff();
   
   const [registrations, setRegistrations] = useState([]);
   const [activities, setActivities] = useState({});
@@ -94,16 +100,13 @@ export default function MyRegistrationsPage() {
   const [visibleQrCodeId, setVisibleQrCodeId] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Effect for fetching base data and listening for real-time registration updates
   useEffect(() => {
-    if (!studentDbProfile || !liffProfile) {
-      // Don't set loading to false here if studentDbProfile is null, 
-      // because we might be showing the setup form.
-      if (studentDbProfile === null) {
-          setIsLoadingData(false);
-      }
-      return;
+    if (isLoading) return;
+    if (!studentDbProfile) {
+        if (studentDbProfile === null) setIsLoadingData(false);
+        return;
     }
+
     setIsLoadingData(true);
     
     const fetchBaseData = async () => {
@@ -121,16 +124,38 @@ export default function MyRegistrationsPage() {
     
     fetchBaseData();
 
-    const regQuery = query(collection(db, 'registrations'), where('lineUserId', '==', liffProfile.userId));
-    const unsubscribe = onSnapshot(regQuery, (querySnapshot) => {
-      setRegistrations(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setIsLoadingData(false);
+    const queries = [];
+    if (liffProfile?.userId) {
+        queries.push(query(collection(db, 'registrations'), where('lineUserId', '==', liffProfile.userId)));
+    }
+    if (studentDbProfile?.nationalId) {
+        queries.push(query(collection(db, 'registrations'), where('nationalId', '==', studentDbProfile.nationalId)));
+    }
+    
+    if (queries.length === 0) {
+        setIsLoadingData(false);
+        return;
+    }
+
+    const unsubscribes = queries.map(q => {
+        return onSnapshot(q, () => {
+            Promise.all(queries.map(getDocs)).then(snapshots => {
+                const allRegistrations = new Map();
+                snapshots.forEach(snapshot => {
+                    snapshot.forEach(doc => {
+                        allRegistrations.set(doc.id, { id: doc.id, ...doc.data() });
+                    });
+                });
+                setRegistrations(Array.from(allRegistrations.values()));
+                setIsLoadingData(false);
+            });
+        });
     });
 
-    return () => unsubscribe();
-  }, [studentDbProfile, liffProfile]);
+    return () => unsubscribes.forEach(unsub => unsub());
 
-  // Effect to automatically close the QR modal when status updates
+  }, [studentDbProfile, liffProfile, isLoading]);
+
   useEffect(() => {
     if (!visibleQrCodeId) return;
     const currentReg = registrations.find(reg => reg.id === visibleQrCodeId);
@@ -139,72 +164,43 @@ export default function MyRegistrationsPage() {
     }
   }, [registrations, visibleQrCodeId]);
 
-  // Effect for auto-syncing registrations created by an admin
-  useEffect(() => {
-    if (!studentDbProfile || !liffProfile) return;
-
-    const syncAdminRegistrations = async () => {
-        try {
-            // Check only if the profile is not yet linked (`studentDbProfile` exists but might be from form setup)
-            const nationalId = studentDbProfile.nationalId;
-            if (!nationalId) return; // Cannot sync without nationalId
-
-            const unlinkedRegQuery = query(
-                collection(db, 'registrations'),
-                where("nationalId", "==", nationalId),
-                where("lineUserId", "==", null)
-            );
-            const snapshot = await getDocs(unlinkedRegQuery);
-            if (!snapshot.empty) {
-                const batch = writeBatch(db);
-                snapshot.forEach(doc => {
-                    batch.update(doc.ref, { lineUserId: liffProfile.userId });
-                });
-                await batch.commit();
-                console.log(`Auto-synced ${snapshot.size} admin-created registrations.`);
-            }
-        } catch (err) {
-            console.error("Auto-sync failed:", err);
-        }
-    };
-    syncAdminRegistrations();
-  }, [studentDbProfile, liffProfile]);
-
-  
   if (isLoading) return <div className="text-center p-10 font-sans">กำลังโหลดข้อมูลผู้ใช้...</div>;
   if (error) return <div className="p-4 text-center text-red-500 bg-red-100 font-sans">{error}</div>;
 
-  // 👇 3. เปลี่ยน Logic ตรงนี้: ถ้า studentDbProfile เป็น null ให้แสดงฟอร์มสร้างโปรไฟล์
   if (studentDbProfile === null) {
     return (
       <ProfileSetupForm 
         liffProfile={liffProfile}
         onProfileCreated={(newProfile) => {
-            // เมื่อสร้างโปรไฟล์สำเร็จ ให้อัปเดต state ใน useLiff hook
             setStudentDbProfile(newProfile); 
         }}
       />
     );
   }
   
-  // Filtering logic for upcoming and past events
   const now = new Date();
   const readyToFilter = Object.keys(activities).length > 0;
-  const sortedRegistrations = readyToFilter ? [...registrations].sort((a, b) => {
-    const actA = activities[a.activityId];
-    const actB = activities[b.activityId];
-    if (!actA || !actB) return 0;
-    return actB.activityDate.seconds - actA.activityDate.seconds;
-  }) : [];
+  
+  const sortedRegistrations = readyToFilter 
+    ? [...registrations].sort((a, b) => {
+        const actA = activities[a.activityId];
+        const actB = activities[b.activityId];
+        // Handle cases where activity or date might be missing
+        if (!actA?.activityDate?.seconds || !actB?.activityDate?.seconds) return 0;
+        return actB.activityDate.seconds - actA.activityDate.seconds;
+      }) 
+    : [];
+
   const upcomingRegistrations = readyToFilter ? sortedRegistrations.filter(reg => {
     const activity = activities[reg.activityId];
-    if (!activity) return false;
+    if (!activity || !activity.activityDate) return false;
     const activityEndDate = new Date(activity.activityDate.toDate().getTime() + 3 * 60 * 60 * 1000);
     return activityEndDate >= now;
   }) : [];
+  
   const pastRegistrations = readyToFilter ? sortedRegistrations.filter(reg => {
     const activity = activities[reg.activityId];
-    if (!activity) return false; 
+    if (!activity || !activity.activityDate) return false; 
     const activityEndDate = new Date(activity.activityDate.toDate().getTime() + 3 * 60 * 60 * 1000);
     return activityEndDate < now;
   }) : [];
