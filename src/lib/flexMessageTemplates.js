@@ -149,3 +149,32 @@ export const createRegistrationSuccessFlex = ({ courseName, activityName, fullNa
     ]
   }
 });
+
+export const createEvaluationRequestFlex = ({ activityId, activityName }) => ({
+  type: "bubble",
+  body: {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      { type: "text", text: "ขอบคุณที่เข้าร่วม!", weight: "bold", size: "xl" },
+      { type: "text", text: `กิจกรรม: ${activityName}`, margin: "md" },
+      { type: "text", text: "กรุณาทำแบบประเมินเพื่อช่วยเราพัฒนา", wrap: true, margin: "md" }
+    ]
+  },
+  footer: {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      {
+        type: "button",
+        action: {
+          type: "uri",
+          label: "ทำแบบประเมิน",
+          uri: `https://line.me/R/app/${process.env.NEXT_PUBLIC_LIFF_ID}/student/evaluation/${activityId}`
+        },
+        style: "primary",
+        color: "#007bff"
+      }
+    ]
+  }
+});

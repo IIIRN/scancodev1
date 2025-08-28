@@ -10,10 +10,9 @@ export default function AdminNavbar() {
 
   const navLinks = [
     { name: 'แดชบอร์ดกิจกรรม', href: '/admin/activity' },
-    // { name: 'ลงทะเบียนให้นักเรียน', href: '/admin/activity/register-student' }, //  <-- ลบบรรทัดนี้
-    { name: 'สแกน Event', href: '/admin/scanner' },
-    { name: 'สแกนคิว', href: '/admin/queue/scanner' },
+    { name: 'สแกนและค้นหา', href: '/admin/scanner' },
     { name: 'เรียกคิว', href: '/admin/queue/call' },
+    { name: 'ผลประเมิน', href: '/admin/evaluation' },
     { name: 'ประวัติ', href: '/admin/history' },
     { name: 'ตั้งค่า', href: '/admin/settings' },
   ];
@@ -49,7 +48,7 @@ export default function AdminNavbar() {
             >
               <span className="sr-only">Open main menu</span>
               {!isOpen ? (
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               ) : (

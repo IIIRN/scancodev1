@@ -1,19 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { db } from '../../lib/firebase'; // ปรับ path ให้ถูกต้อง
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * Component ฟอร์มสำหรับให้ผู้ใช้ใหม่สร้างโปรไฟล์นักเรียน
- * @param {object} props - Props ที่รับเข้ามา
- * @param {object} props.liffProfile - โปรไฟล์ที่ได้จาก LIFF (เพื่อใช้ userId)
- * @param {function} props.onProfileCreated - Callback function ที่จะทำงานเมื่อสร้างโปรไฟล์สำเร็จ
+ * Component for new users to set up their student profile.
+ * It intelligently fetches existing data if available.
+ * @param {object} props - Component props.
+ * @param {object} props.liffProfile - Profile from LIFF (for userId and displayName).
+ * @param {function} props.onProfileCreated - Callback function after profile creation.
  */
 export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
-  // 👇 แก้ไข: ให้ fullName เริ่มต้นเป็นค่าว่างเสมอ
-  const [fullName, setFullName] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -22,26 +20,42 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
-    
-    const profileData = { 
-      fullName: fullName.trim(), 
-      studentId: studentId.trim() || null, // ให้เป็น null หากไม่กรอก
-      nationalId: nationalId.trim(), 
-      createdAt: serverTimestamp() 
-    };
 
     try {
-      // ใช้ lineUserId เป็น ID ของ document เพื่อให้เชื่อมโยงกัน
+      // 1. Search for an existing registration with the provided National ID
+      const registrationsRef = collection(db, 'registrations');
+      const q = query(registrationsRef, where("nationalId", "==", nationalId.trim()), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      let fullNameFromDb = null;
+      let studentIdFromDb = null;
+
+      if (!querySnapshot.empty) {
+        // If found, use the data from the registration
+        const regData = querySnapshot.docs[0].data();
+        fullNameFromDb = regData.fullName;
+        studentIdFromDb = regData.studentId || null;
+      }
+
+      // 2. Prepare profile data
+      const profileData = {
+        fullName: fullNameFromDb || liffProfile.displayName, // Use DB name if found, otherwise fallback to LINE name
+        studentId: studentIdFromDb, // Use DB student ID if found
+        nationalId: nationalId.trim(),
+        createdAt: serverTimestamp()
+      };
+
+      // 3. Create the student profile document using the LIFF User ID
       const studentDocRef = doc(db, 'studentProfiles', liffProfile.userId);
       await setDoc(studentDocRef, profileData);
       
-      // ส่งข้อมูลที่เพิ่งสร้างกลับไปให้หน้าหลักเพื่ออัปเดต UI ทันที
-      onProfileCreated(profileData); 
+      // 4. Trigger the callback to update the UI immediately
+      onProfileCreated(profileData);
+
     } catch (err) {
       setError("เกิดข้อผิดพลาดในการบันทึกโปรไฟล์");
       console.error("Profile creation error:", err);
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Ensure button is re-enabled on error
     }
   };
 
@@ -49,19 +63,20 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
     <div className="max-w-md mx-auto p-4 md:p-8">
       <div className="bg-white p-6 rounded-lg shadow-md text-center">
         <h1 className="text-2xl font-bold mb-2">ตั้งค่าโปรไฟล์นักเรียน</h1>
-        <p className="text-gray-600 mb-6">ข้อมูลนี้จะถูกใช้ในการลงทะเบียนกิจกรรมต่างๆ</p>
+        <p className="text-gray-600 mb-6">กรุณายืนยันเลขบัตรประชาชนเพื่อเชื่อมต่อกับกิจกรรม</p>
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">ชื่อ-สกุล</label>
-            <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="mt-1 w-full p-3 border border-gray-300 rounded-md" placeholder="กรุณากรอกชื่อและนามสกุล"/>
-          </div>
-          <div>
-            <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">รหัสนักศึกษา (ไม่บังคับ)</label>
-            <input id="studentId" type="text" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="mt-1 w-full p-3 border border-gray-300 rounded-md" placeholder="กรุณากรอกรหัสนักศึกษา (หากมี)"/>
-          </div>
-          <div>
             <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700">เลขบัตรประชาชน (13 หลัก)</label>
-            <input id="nationalId" type="tel" value={nationalId} onChange={(e) => setNationalId(e.target.value)} required pattern="\d{13}" className="mt-1 w-full p-3 border border-gray-300 rounded-md" placeholder="กรุณากรอกเลขบัตรประชาชน"/>
+            <input
+              id="nationalId"
+              type="tel"
+              value={nationalId}
+              onChange={(e) => setNationalId(e.target.value)}
+              required
+              pattern="\d{13}"
+              className="mt-1 w-full p-3 border border-gray-300 rounded-md"
+              placeholder="กรุณากรอกเลขบัตรประชาชน"
+            />
           </div>
           
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
