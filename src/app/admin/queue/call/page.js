@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '../../../../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, onSnapshot, writeBatch, serverTimestamp, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 
 export default function SelectQueueActivityPage() {
@@ -46,7 +46,7 @@ export default function SelectQueueActivityPage() {
           ))}
         </div>
       ) : (
-        <p className="text-center text-gray-500">ไม่พบกิจกรรมประเภท "เรียกคิว"</p>
+        <p className="text-center text-gray-500">ไม่พบกิจกรรมประเภท &quot;เรียกคิว&quot;</p>
       )}
     </div>
   );
