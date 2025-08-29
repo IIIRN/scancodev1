@@ -69,13 +69,13 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div>
             <label htmlFor="nationalId" className="block text-sm font-medium text-gray-700">เลขบัตรประชาชน (13 หลัก)</label>
-            <input
+           <input
               id="nationalId"
               type="tel"
               value={nationalId}
               onChange={(e) => setNationalId(e.target.value)}
               required
-              pattern="\\d{13}"
+              pattern="\d{13}"
               className="mt-1 w-full p-3 border border-gray-300 rounded-md"
               placeholder="กรุณากรอกเลขบัตรประชาชน"
             />
