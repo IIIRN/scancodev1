@@ -170,9 +170,9 @@ export const createQueueCheckInSuccessFlex = ({ activityName, fullName, course, 
 
 
 /**
- * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อลงทะเบียนสำเร็จ
+ * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อลงทะเบียนสำเร็จ (ฉบับแก้ไข)
  */
-export const createRegistrationSuccessFlex = ({ courseName, activityName, fullName, studentId }) => ({
+export const createRegistrationSuccessFlex = ({ categoryName, activityName, fullName, studentId }) => ({
   type: "bubble",
   header: {
     type: "box",
@@ -196,8 +196,8 @@ export const createRegistrationSuccessFlex = ({ courseName, activityName, fullNa
     layout: "vertical",
     spacing: "md",
     contents: [
-      { type: "text", text: "หลักสูตร", size: "sm", color: "#AAAAAA" },
-      { type: "text", text: courseName || "-", weight: "bold", size: "md", margin: "none", wrap: true },
+      { type: "text", text: "หมวดหมู่", size: "sm", color: "#AAAAAA" }, // ✅ Changed text
+      { type: "text", text: categoryName || "-", weight: "bold", size: "md", margin: "none", wrap: true }, // ✅ Changed variable
       { type: "text", text: "กิจกรรม", size: "sm", color: "#AAAAAA", margin: "md" },
       { type: "text", text: activityName || "-", weight: "bold", size: "md", margin: "none", wrap: true },
       { type: "separator", margin: "lg" },
@@ -240,9 +240,9 @@ export const createEvaluationRequestFlex = ({ activityId, activityName }) => ({
     type: "box",
     layout: "vertical",
     contents: [
-      { type: "text", text: "ขอบคุณที่เข้าร่วม!", weight: "bold", size: "xl" },
+      { type: "text", text: "สัมภาษณ์สมบูรณ์!!", weight: "bold", size: "xl" },
       { type: "text", text: `กิจกรรม: ${activityName}`, margin: "md" },
-      { type: "text", text: "กรุณาทำแบบประเมินเพื่อช่วยเราพัฒนา", wrap: true, margin: "md" }
+      { type: "text", text: "กรุณาทำแบบประเมินเพื่อสำเร็จกระบวนการสอบ", wrap: true, margin: "md" }
     ]
   },
   footer: {
@@ -257,7 +257,7 @@ export const createEvaluationRequestFlex = ({ activityId, activityName }) => ({
           uri: `https://line.me/R/app/${process.env.NEXT_PUBLIC_LIFF_ID}/student/evaluation/${activityId}`
         },
         style: "primary",
-        color: "#007bff"
+        color: "#071D4A"
       }
     ]
   }
@@ -288,7 +288,7 @@ export const createQueueCallFlex = ({ activityName, channelName, queueNumber, co
       }
     ],
     paddingAll: "20px",
-    backgroundColor: "#0367D3",
+    backgroundColor: "#071D4A",
     spacing: "md",
     paddingTop: "22px"
   },

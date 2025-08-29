@@ -24,8 +24,8 @@ export default function EditActivityPage({ params }) {
   const { id: activityId } = use(params); 
   const router = useRouter();
 
-  const [categories, setCategories] = useState([]); // ✅ Changed to categories
-  const [selectedCategory, setSelectedCategory] = useState(''); // ✅ Changed to selectedCategory
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [activityName, setActivityName] = useState('');
   const [capacity, setCapacity] = useState(50);
   const [activityDate, setActivityDate] = useState('');
@@ -40,7 +40,6 @@ export default function EditActivityPage({ params }) {
 
     const fetchData = async () => {
       try {
-        // ✅ Fetch categories
         const categoriesSnapshot = await getDocs(collection(db, 'categories'));
         const categoriesData = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setCategories(categoriesData);
@@ -51,7 +50,7 @@ export default function EditActivityPage({ params }) {
         if (activitySnap.exists()) {
           const data = activitySnap.data();
           setActivityName(data.name);
-          setSelectedCategory(data.categoryId); // ✅ Use categoryId
+          setSelectedCategory(data.categoryId);
           setCapacity(data.capacity);
           setLocation(data.location);
           setActivityType(data.type || 'event');
@@ -83,7 +82,7 @@ export default function EditActivityPage({ params }) {
       const firestoreTimestamp = Timestamp.fromDate(new Date(dateTimeString));
       const updatedData = {
         name: activityName,
-        categoryId: selectedCategory, // ✅ Use categoryId
+        categoryId: selectedCategory,
         capacity: Number(capacity),
         location: location,
         type: activityType,

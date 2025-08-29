@@ -12,15 +12,19 @@ export default function EvaluationPage() {
     const { activityId } = params;
     const { liffProfile } = useLiff();
     
-    const [ratings, setRatings] = useState({ q1: 0, q2: 0, q3: 0 });
-    const [comment, setComment] = useState('');
+    // New state for the new questions
+    const [satisfaction, setSatisfaction] = useState('');
+    const [source, setSource] = useState('');
+    
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [message, setMessage] = useState('');
     
-    const questions = [
-        "ความพึงพอใจโดยรวม",
-        "ความรู้ที่ได้รับ",
-        "การจัดกิจกรรม"
+    const satisfactionOptions = [
+        "มากที่สุด",
+        "มาก",
+        "ปานกลาง",
+        "น้อย",
+        "ควรปรับปรุง"
     ];
 
     const handleSubmit = async (e) => {
@@ -28,8 +32,8 @@ export default function EvaluationPage() {
         setIsSubmitting(true);
         setMessage('');
 
-        if (Object.values(ratings).some(r => r === 0)) {
-            setMessage('กรุณาให้คะแนนครบทุกข้อ');
+        if (!satisfaction || !source.trim()) {
+            setMessage('กรุณากรอกข้อมูลให้ครบทุกข้อ');
             setIsSubmitting(false);
             return;
         }
@@ -38,8 +42,8 @@ export default function EvaluationPage() {
             await addDoc(collection(db, 'evaluations'), {
                 activityId,
                 userId: liffProfile?.userId || 'unknown',
-                ratings,
-                comment,
+                satisfaction: satisfaction, // Save the satisfaction level
+                source: source.trim(), // Save the source text
                 submittedAt: serverTimestamp()
             });
             setMessage('ขอบคุณสำหรับการประเมิน!');
@@ -54,34 +58,37 @@ export default function EvaluationPage() {
         <div className="max-w-2xl mx-auto p-4 md:p-8">
             <h1 className="text-2xl font-bold mb-4">แบบประเมินกิจกรรม</h1>
             <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md space-y-6">
-                {questions.map((q, i) => (
-                    <div key={i}>
-                        <p className="font-semibold">{i + 1}. {q}</p>
-                        <div className="flex justify-center gap-2 mt-2">
-                            {[1, 2, 3, 4, 5].map(star => (
-                                <button 
-                                    key={star} 
-                                    type="button"
-                                    onClick={() => setRatings({...ratings, [`q${i+1}`]: star})}
-                                    className={`text-3xl ${star <= ratings[`q${i+1}`] ? 'text-yellow-400' : 'text-gray-300'}`}
-                                >
-                                    ★
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                ))}
                 <div>
-                    <label className="font-semibold">ข้อเสนอแนะเพิ่มเติม:</label>
+                    <p className="font-semibold">1. ความพึงพอใจโดยรวมต่อกระบวนการรับสมัคร</p>
+                    <div className="mt-2 space-y-2">
+                        {satisfactionOptions.map((option) => (
+                            <label key={option} className="flex items-center p-3 border rounded-md has-[:checked]:bg-blue-50 has-[:checked]:border-primary cursor-pointer">
+                                <input 
+                                    type="radio"
+                                    name="satisfaction"
+                                    value={option}
+                                    checked={satisfaction === option}
+                                    onChange={(e) => setSatisfaction(e.target.value)}
+                                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300"
+                                />
+                                <span className="ml-3 text-gray-700">{option}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+                <div>
+                    <label className="font-semibold">2. ท่านทราบข้อมูลการรับสมัครจากช่องทางใด</label>
                     <textarea 
-                        value={comment}
-                        onChange={e => setComment(e.target.value)}
+                        value={source}
+                        onChange={e => setSource(e.target.value)}
                         className="w-full mt-2 p-2 border rounded"
                         rows="3"
+                        placeholder="ระบุช่องทาง..."
+                        required
                     ></textarea>
                 </div>
-                {message && <p className="text-center">{message}</p>}
-                <button type="submit" disabled={isSubmitting} className="w-full py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
+                {message && <p className="text-center font-bold text-green-600">{message}</p>}
+                <button type="submit" disabled={isSubmitting} className="w-full py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:bg-gray-400">
                     {isSubmitting ? 'กำลังส่ง...' : 'ส่งแบบประเมิน'}
                 </button>
             </form>

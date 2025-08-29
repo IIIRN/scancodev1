@@ -35,7 +35,7 @@ export default function SelectEvaluationPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {activities.map(activity => (
           <Link key={activity.id} href={`/admin/evaluation/${activity.id}`}>
-            <div className="block p-6 bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
+            <div className="block p-6 bg-white border rounded-lg shadow hover:shadow-lg transition-shadow">
               <h2 className="text-lg font-semibold">{activity.name}</h2>
             </div>
           </Link>

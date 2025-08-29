@@ -15,6 +15,9 @@ const translateStatus = (status) => {
   switch (status) {
     case 'checked-in': return 'เช็คอินแล้ว';
     case 'registered': return 'ลงทะเบียนแล้ว';
+    case 'cancelled': return 'ยกเลิกแล้ว';
+    case 'waitlisted': return 'รอคิว';
+    case 'completed': return 'สำเร็จแล้ว';
     default: return status || '';
   }
 };
