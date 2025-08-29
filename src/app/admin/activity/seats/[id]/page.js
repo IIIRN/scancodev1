@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
 import { db } from '../../../../../lib/firebase';
 import {
   doc, getDoc, updateDoc, collection, query,
   where, getDocs, writeBatch, serverTimestamp, deleteDoc, addDoc, onSnapshot
 } from 'firebase/firestore';
-import { use } from 'react';
 import Papa from "papaparse";
+import { CSVLink } from "react-csv";
 
 // Helper function to translate status to Thai
 const translateStatus = (status) => {
@@ -26,7 +26,7 @@ export default function SeatAssignmentPage({ params }) {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   
-  // State for adding new participant (for queue type)
+  // State for adding new participant
   const [form, setForm] = useState({
     fullName: '', studentId: '', nationalId: '', course: '', timeSlot: ''
   });
@@ -38,7 +38,6 @@ export default function SeatAssignmentPage({ params }) {
   const [courseOptions, setCourseOptions] = useState([]);
   const [timeSlotOptions, setTimeSlotOptions] = useState([]);
 
-  // Fetch options from settings
   useEffect(() => {
     const unsubCourses = onSnapshot(collection(db, 'courseOptions'), (snapshot) => {
         setCourseOptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -148,6 +147,68 @@ export default function SeatAssignmentPage({ params }) {
     }
   };
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+            const newRegistrants = results.data;
+            setMessage(`กำลังนำเข้าข้อมูล ${newRegistrants.length} รายการ...`);
+            
+            try {
+                const batch = writeBatch(db);
+                newRegistrants.forEach(reg => {
+                    if (reg.fullName && reg.nationalId) {
+                        const newRegRef = doc(collection(db, 'registrations'));
+                        batch.set(newRegRef, {
+                            activityId,
+                            courseId: activity?.courseId || null,
+                            fullName: reg.fullName,
+                            studentId: reg.studentId || null,
+                            nationalId: reg.nationalId,
+                            course: reg.course || null,
+                            timeSlot: reg.timeSlot || null,
+                            status: 'registered',
+                            registeredBy: 'admin_csv_import',
+                            registeredAt: serverTimestamp(),
+                        });
+                    }
+                });
+                await batch.commit();
+                setMessage(`✅ นำเข้าข้อมูล ${newRegistrants.length} รายการสำเร็จ!`);
+                fetchData();
+            } catch (error) {
+                setMessage(`❌ เกิดข้อผิดพลาดในการนำเข้า: ${error.message}`);
+            }
+        },
+        error: (error) => {
+            setMessage(`❌ เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: ${error.message}`);
+        }
+    });
+  };
+
+  // ✅ Headers for CSV export, keys and labels are now identical for re-import compatibility
+  const csvExportHeaders = [
+    { label: "fullName", key: "fullName" },
+    { label: "studentId", key: "studentId" },
+    { label: "nationalId", key: "nationalId" },
+    { label: "course", key: "course" },
+    { label: "timeSlot", key: "timeSlot" },
+  ];
+
+  // ✅ Data for export, contains only the necessary fields for re-import
+  const csvExportData = registrants.map(reg => ({
+      fullName: reg.fullName || '',
+      studentId: reg.studentId || '',
+      nationalId: reg.nationalId || '',
+      course: reg.course || '',
+      timeSlot: reg.timeSlot || '',
+  }));
+
+
   if (isLoading) return <div className="text-center p-10 font-sans">กำลังโหลด...</div>;
 
   return (
@@ -163,26 +224,54 @@ export default function SeatAssignmentPage({ params }) {
         
         {message && <p className="text-center mb-4 font-semibold text-blue-700">{message}</p>}
 
-        <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-            <h2 className="text-xl font-semibold mb-4">เพิ่มนักเรียนในกิจกรรม</h2>
-            <form onSubmit={handleAddParticipant} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <input type="text" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} placeholder="ชื่อ-สกุล*" className="p-2 border rounded" required />
-                <input type="text" value={form.studentId} onChange={e => setForm({...form, studentId: e.target.value})} placeholder="รหัสนักศึกษา" className="p-2 border rounded" />
-                <input type="text" value={form.nationalId} onChange={e => setForm({...form, nationalId: e.target.value})} placeholder="เลขบัตรประชาชน*" className="p-2 border rounded" required pattern="\d{13}" />
-                {activity?.type === 'queue' && (
-                    <>
-                        <select value={form.course} onChange={e => setForm({...form, course: e.target.value})} className="p-2 border rounded" required>
-                            <option value="">เลือกหลักสูตร*</option>
-                            {courseOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                        </select>
-                        <select value={form.timeSlot} onChange={e => setForm({...form, timeSlot: e.target.value})} className="p-2 border rounded" required>
-                            <option value="">เลือกช่วงเวลา*</option>
-                            {timeSlotOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                        </select>
-                    </>
-                )}
-                <button type="submit" className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 h-full">เพิ่ม</button>
-            </form>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-white p-4 rounded-lg shadow-md">
+                <h2 className="text-xl font-semibold mb-4">นำเข้าและส่งออกข้อมูล</h2>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                           นำเข้าไฟล์ CSV (ต้องมี Header: fullName, nationalId)
+                        </label>
+                        <input 
+                            type="file" 
+                            accept=".csv" 
+                            onChange={handleFileUpload}
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                    </div>
+                    <div>
+                        <CSVLink
+                            data={csvExportData}
+                            headers={csvExportHeaders}
+                            filename={`import_template_${activityId}.csv`}
+                            className="w-full text-center block px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700"
+                        >
+                            Export ข้อมูลสำหรับ Import
+                        </CSVLink>
+                    </div>
+                </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-md">
+                <h2 className="text-xl font-semibold mb-4">เพิ่มนักเรียนรายบุคคล</h2>
+                <form onSubmit={handleAddParticipant} className="space-y-3">
+                    <input type="text" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} placeholder="ชื่อ-สกุล*" className="p-2 border rounded w-full" required />
+                    <input type="text" value={form.studentId} onChange={e => setForm({...form, studentId: e.target.value})} placeholder="รหัสนักศึกษา" className="p-2 border rounded w-full" />
+                    <input type="text" value={form.nationalId} onChange={e => setForm({...form, nationalId: e.target.value})} placeholder="เลขบัตรประชาชน*" className="p-2 border rounded w-full" required pattern="\d{13}" />
+                    {activity?.type === 'queue' && (
+                        <>
+                            <select value={form.course} onChange={e => setForm({...form, course: e.target.value})} className="p-2 border rounded w-full" required>
+                                <option value="">เลือกหลักสูตร*</option>
+                                {courseOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            </select>
+                            <select value={form.timeSlot} onChange={e => setForm({...form, timeSlot: e.target.value})} className="p-2 border rounded w-full" required>
+                                <option value="">เลือกช่วงเวลา*</option>
+                                {timeSlotOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                            </select>
+                        </>
+                    )}
+                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">เพิ่ม</button>
+                </form>
+            </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-md overflow-x-auto">

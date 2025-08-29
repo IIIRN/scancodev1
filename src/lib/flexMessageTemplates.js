@@ -178,3 +178,107 @@ export const createEvaluationRequestFlex = ({ activityId, activityName }) => ({
     ]
   }
 });
+
+/**
+ * สร้าง Flex Message สำหรับแจ้งเตือนเมื่อถึงคิว
+ * @param {object} data - ข้อมูลสำหรับแสดงผล
+ * @param {string} data.activityName - ชื่อกิจกรรม
+ * @param {string} data.channelName - ชื่อช่องบริการ
+ * @param {string} data.queueNumber - หมายเลขคิว
+ * @param {string} data.courseName - ชื่อหลักสูตร
+ * @returns {object} - JSON Object ของ Flex Message
+ */
+export const createQueueCallFlex = ({ activityName, channelName, queueNumber, courseName }) => ({
+  type: "bubble",
+  header: {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      {
+        type: "text",
+        text: "NOTIFICATION",
+        color: "#ffffff66",
+        size: "sm"
+      },
+      {
+        type: "text",
+        text: "ถึงคิวของคุณแล้ว",
+        color: "#ffffff",
+        size: "xl",
+        flex: 4,
+        weight: "bold"
+      }
+    ],
+    paddingAll: "20px",
+    backgroundColor: "#0367D3",
+    spacing: "md",
+    paddingTop: "22px"
+  },
+  body: {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      {
+        type: "text",
+        text: activityName,
+        wrap: true,
+        weight: "bold",
+        size: "lg"
+      },
+      {
+        type: "box",
+        layout: "baseline",
+        contents: [
+          {
+            type: "text",
+            text: "หลักสูตร:",
+            color: "#8c8c8c",
+            size: "md",
+            flex: 2
+          },
+          {
+            type: "text",
+            text: courseName,
+            wrap: true,
+            color: "#4a4a4a",
+            size: "md",
+            flex: 5
+          }
+        ],
+        spacing: "sm",
+        margin: "md"
+      }
+    ]
+  },
+  footer: {
+    type: "box",
+    layout: "vertical",
+    contents: [
+      {
+        type: "text",
+        text: "กรุณาไปที่",
+        size: "lg",
+        align: "center",
+        color: "#4A4A4A"
+      },
+      {
+        type: "text",
+        text: channelName,
+        weight: "bold",
+        size: "xxl",
+        align: "center",
+        color: "#1a237e",
+        margin: "md"
+      },
+      {
+        type: "text",
+        text: `หมายเลขคิว ${queueNumber}`,
+        size: "lg",
+        align: "center",
+        color: "#4A4A4A",
+        margin: "md"
+      }
+    ],
+    spacing: "sm"
+  }
+});

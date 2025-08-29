@@ -5,7 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../../../lib/firebase';
 import {
   doc, getDoc, updateDoc, addDoc, collection,
-  serverTimestamp, query, where, getDocs, runTransaction
+  serverTimestamp, query, where, getDocs, runTransaction, Timestamp
 } from 'firebase/firestore';
 import { createCheckInSuccessFlex, createEvaluationRequestFlex } from '../../../lib/flexMessageTemplates';
 
@@ -19,6 +19,7 @@ export default function UniversalScannerPage() {
   const [scanMode, setScanMode] = useState('check-in');
   const [searchMode, setSearchMode] = useState('scan');
   const [activities, setActivities] = useState([]);
+  const [courses, setCourses] = useState({}); // ✅ State to hold course data
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [nationalIdInput, setNationalIdInput] = useState('');
   const [scannerState, setScannerState] = useState('idle');
@@ -28,11 +29,30 @@ export default function UniversalScannerPage() {
   const qrScannerRef = useRef(null);
 
   useEffect(() => {
-    const fetchActivities = async () => {
-      const activitiesSnapshot = await getDocs(collection(db, 'activities'));
-      setActivities(activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const fetchData = async () => {
+      // Fetch upcoming activities
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const activitiesQuery = query(collection(db, 'activities'), where("activityDate", ">=", Timestamp.fromDate(today)));
+      
+      // ✅ Fetch all courses
+      const coursesQuery = collection(db, 'courses');
+
+      const [activitiesSnapshot, coursesSnapshot] = await Promise.all([
+        getDocs(activitiesQuery),
+        getDocs(coursesQuery)
+      ]);
+
+      const activitiesData = activitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      activitiesData.sort((a, b) => b.activityDate.seconds - a.activityDate.seconds);
+      setActivities(activitiesData);
+      
+      // ✅ Map courses by ID for easy lookup
+      const coursesMap = {};
+      coursesSnapshot.forEach(doc => { coursesMap[doc.id] = doc.data().name; });
+      setCourses(coursesMap);
     };
-    fetchActivities();
+    fetchData();
   }, []);
 
   const stopScanner = async () => {
@@ -133,99 +153,71 @@ export default function UniversalScannerPage() {
   const handleConfirm = async (e) => {
     e.preventDefault();
     setScannerState('submitting');
-    if (scanMode === 'check-in') {
-        if (selectedActivity.type === 'queue') await handleQueueCheckIn();
-        else await handleEventCheckIn();
-    } else {
-        await handleCheckOut();
-    }
-  };
-  
-  const handleEventCheckIn = async () => {
-    if (!seatNumberInput.trim()) {
-      setMessage("กรุณากำหนดเลขที่นั่ง"); 
-      setScannerState('found');
-      return;
-    }
+    
     try {
+        const settingsRef = doc(db, 'systemSettings', 'notifications');
+        const settingsSnap = await getDoc(settingsRef);
+        const settings = settingsSnap.exists() ? settingsSnap.data() : { onCheckIn: true, onCheckOut: true };
+
         const { registration, activity } = foundData;
         const regRef = doc(db, 'registrations', registration.id);
-        await updateDoc(regRef, { 
-            status: 'checked-in', 
-            seatNumber: seatNumberInput.trim() 
-        });
-        setMessage(`✅ เช็คอิน ${registration.fullName} สำเร็จ!`);
-        setTimeout(() => resetState(), 2000);
-    } catch (error) {
-        setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
-        setScannerState('found');
-    }
-  };
-  
-  const handleQueueCheckIn = async () => {
-    try {
-        const { registration } = foundData;
-        const result = await runTransaction(db, async (transaction) => {
-            const regRef = doc(db, 'registrations', registration.id);
-            const regDoc = await transaction.get(regRef);
-            if (!regDoc.exists()) throw new Error("ไม่พบข้อมูล");
 
-            const regData = regDoc.data();
-            if (regData.status === 'checked-in') throw new Error(`ได้รับคิวแล้ว (คิวที่ ${regData.queueNumber})`);
-            if (!regData.course) throw new Error('นักเรียนยังไม่ได้ถูกกำหนดหลักสูตร');
+        if (scanMode === 'check-in') {
+            const updateData = { status: 'checked-in' };
+            if (activity.type !== 'queue') {
+                if (!seatNumberInput.trim()) {
+                    setMessage("กรุณากำหนดเลขที่นั่ง");
+                    setScannerState('found');
+                    return;
+                }
+                updateData.seatNumber = seatNumberInput.trim();
+            }
+            await updateDoc(regRef, updateData);
 
-            const q = query(collection(db, 'registrations'), 
-                where("activityId", "==", selectedActivity.id),
-                where("course", "==", regData.course),
-                where("status", "==", "checked-in")
-            );
-            
-            const checkedInSnapshot = await getDocs(q);
-            const nextQueueNumber = checkedInSnapshot.size + 1;
+            if (settings.onCheckIn && registration.lineUserId) {
+                const flexMessage = createCheckInSuccessFlex({
+                    courseName: courses[activity.courseId] || registration.course || 'ทั่วไป',
+                    activityName: activity.name,
+                    fullName: registration.fullName,
+                    studentId: registration.studentId,
+                    seatNumber: updateData.seatNumber || '-'
+                });
+                await fetch('/api/send-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: registration.lineUserId, flexMessage })
+                });
+            }
+            setMessage(`✅ เช็คอิน ${registration.fullName} สำเร็จ!`);
 
-            transaction.update(regRef, { status: 'checked-in', queueNumber: nextQueueNumber });
-            
-            return { name: regData.fullName, queue: nextQueueNumber, course: regData.course };
-        });
-
-        setMessage(`✅ สำเร็จ! ${result.name} ได้รับคิวที่ ${result.queue} (${result.course})`);
-        setTimeout(() => resetState(), 2000);
-    } catch (err) {
-        setMessage(`❌ ${err.message}`);
-        setScannerState('found');
-    }
-  };
-
-  const handleCheckOut = async () => {
-    try {
-        const { registration, activity } = foundData;
-        const regRef = doc(db, 'registrations', registration.id);
-        
-        await updateDoc(regRef, {
-            status: 'completed',
-            completedAt: serverTimestamp()
-        });
-
-        if (registration.lineUserId) {
-            const flexMessage = createEvaluationRequestFlex({
-                activityId: registration.activityId,
-                activityName: activity.name,
+        } else {
+            await updateDoc(regRef, {
+                status: 'completed',
+                completedAt: serverTimestamp()
             });
-            await fetch('/api/send-notification', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: registration.lineUserId, flexMessage })
-            });
+
+            if (settings.onCheckOut && registration.lineUserId) {
+                const flexMessage = createEvaluationRequestFlex({
+                    activityId: registration.activityId,
+                    activityName: activity.name,
+                });
+                await fetch('/api/send-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: registration.lineUserId, flexMessage })
+                });
+            }
+            setMessage(`✅ ${registration.fullName} จบกิจกรรมแล้ว`);
         }
         
-        setMessage(`✅ ${registration.fullName} จบกิจกรรมแล้ว`);
         setTimeout(() => resetState(), 2000);
 
-    } catch(err) {
+    } catch (err) {
         setMessage(`เกิดข้อผิดพลาด: ${err.message}`);
         setScannerState('found');
     }
   };
+
 
   return (
     <div className="max-w-xl mx-auto p-4 md:p-8 font-sans">
