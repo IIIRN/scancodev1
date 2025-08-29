@@ -5,7 +5,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../../../lib/firebase';
 import {
   doc, getDoc, updateDoc, collection,
-  serverTimestamp, query, where, getDocs, runTransaction, Timestamp, limit
+  serverTimestamp, query, where, getDocs, runTransaction, Timestamp, limit, addDoc
 } from 'firebase/firestore';
 import { createCheckInSuccessFlex, createEvaluationRequestFlex, createQueueCheckInSuccessFlex } from '../../../lib/flexMessageTemplates';
 
@@ -39,7 +39,7 @@ export default function UniversalScannerPage() {
 
       const [activitiesSnapshot, categoriesSnapshot, coursesSnapshot] = await Promise.all([
         getDocs(activitiesQuery),
-        getDocs(categoriesQuery), // ✅ Corrected this line
+        getDocs(categoriesQuery),
         getDocs(coursesQuery)
       ]);
 
@@ -127,8 +127,8 @@ export default function UniversalScannerPage() {
 
         setFoundData({ registration: registrationData, activity: selectedActivity });
         if (registrationData.seatNumber) setSeatNumberInput(registrationData.seatNumber);
-        setScannerState('found');
         setMessage('');
+        setScannerState('found');
 
     } catch(err) {
         setMessage(`❌ ${err.message}`);
@@ -191,39 +191,68 @@ export default function UniversalScannerPage() {
         if (scanMode === 'check-in') {
             let successMessage = `✅ เช็คอิน ${registration.fullName} สำเร็จ!`;
             let flexMessage = null;
+            let finalQueueData;
 
             if (activity.type === 'queue') {
-                const result = await runTransaction(db, async (transaction) => {
-                    const regRef = doc(db, 'registrations', registration.id);
-                    const regDoc = await transaction.get(regRef);
-                    if (!regDoc.exists()) throw new Error("ไม่พบข้อมูล");
-                    const regData = regDoc.data();
-                    if (!regData.course) throw new Error('นักเรียนยังไม่ได้ถูกกำหนดหลักสูตร');
-                    const q = query(collection(db, 'registrations'), where("activityId", "==", selectedActivity.id), where("course", "==", regData.course), where("status", "==", "checked-in"));
-                    const checkedInSnapshot = await getDocs(q);
-                    const nextQueueNumber = checkedInSnapshot.size + 1;
+                if (registration.displayQueueNumber) {
+                     const result = await runTransaction(db, async (transaction) => {
+                        const regRef = doc(db, 'registrations', registration.id);
+                        const q = query(collection(db, 'registrations'), where("activityId", "==", activity.id), where("course", "==", registration.course), where("status", "==", "checked-in"));
+                        const checkedInSnapshot = await getDocs(q);
+                        const nextQueueNumber = checkedInSnapshot.size + 1;
 
-                    const courseInfo = courseOptions.find(c => c.name === regData.course);
-                    const prefix = courseInfo?.shortName || '';
-                    const displayQueueNumber = `${prefix}${nextQueueNumber}`;
-                    
-                    transaction.update(regRef, { 
-                        status: 'checked-in', 
-                        queueNumber: nextQueueNumber,
-                        displayQueueNumber: displayQueueNumber
+                        transaction.update(regRef, {
+                            status: 'checked-in',
+                            queueNumber: nextQueueNumber
+                        });
+                        return { ...registration, queueNumber: nextQueueNumber };
                     });
-                    
-                    return { ...regData, queueNumber: nextQueueNumber, displayQueueNumber };
+                    finalQueueData = result;
+                    successMessage = `✅ สำเร็จ! ${finalQueueData.fullName} ได้รับคิว ${finalQueueData.displayQueueNumber} (${finalQueueData.course})`;
+                } else {
+                     const result = await runTransaction(db, async (transaction) => {
+                        const regRef = doc(db, 'registrations', registration.id);
+                        const regDoc = await transaction.get(regRef);
+                        if (!regDoc.exists()) throw new Error("ไม่พบข้อมูล");
+                        const regData = regDoc.data();
+                        if (!regData.course) throw new Error('นักเรียนยังไม่ได้ถูกกำหนดหลักสูตร');
+                        const q = query(collection(db, 'registrations'), where("activityId", "==", selectedActivity.id), where("course", "==", regData.course), where("status", "==", "checked-in"));
+                        const checkedInSnapshot = await getDocs(q);
+                        const nextQueueNumber = checkedInSnapshot.size + 1;
+
+                        const courseInfo = courseOptions.find(c => c.name === regData.course);
+                        const prefix = courseInfo?.shortName || '';
+                        const displayQueueNumber = `${prefix}${nextQueueNumber}`;
+                        
+                        transaction.update(regRef, { 
+                            status: 'checked-in', 
+                            queueNumber: nextQueueNumber,
+                            displayQueueNumber: displayQueueNumber
+                        });
+                        
+                        return { ...regData, queueNumber: nextQueueNumber, displayQueueNumber };
+                    });
+                    finalQueueData = result;
+                    successMessage = `✅ สำเร็จ! ${finalQueueData.fullName} ได้รับคิว ${finalQueueData.displayQueueNumber} (${finalQueueData.course})`;
+                }
+
+                await addDoc(collection(db, 'checkInLogs'), {
+                    activityId: activity.id,
+                    activityName: activity.name,
+                    studentName: finalQueueData.fullName,
+                    nationalId: finalQueueData.nationalId,
+                    status: 'checked-in',
+                    assignedSeat: `คิว ${finalQueueData.displayQueueNumber}`,
+                    timestamp: serverTimestamp(),
+                    adminId: 'admin'
                 });
 
-                successMessage = `✅ สำเร็จ! ${result.fullName} ได้รับคิว ${result.displayQueueNumber} (${result.course})`;
-                
                 flexMessage = createQueueCheckInSuccessFlex({
                     activityName: activity.name,
-                    fullName: result.fullName,
-                    course: result.course,
-                    timeSlot: result.timeSlot,
-                    queueNumber: result.displayQueueNumber
+                    fullName: finalQueueData.fullName,
+                    course: finalQueueData.course,
+                    timeSlot: finalQueueData.timeSlot,
+                    queueNumber: finalQueueData.displayQueueNumber
                 });
 
             } else { // Event type check-in
@@ -234,6 +263,17 @@ export default function UniversalScannerPage() {
                 }
                 const regRef = doc(db, 'registrations', registration.id);
                 await updateDoc(regRef, { status: 'checked-in', seatNumber: seatNumberInput.trim() });
+
+                await addDoc(collection(db, 'checkInLogs'), {
+                    activityId: activity.id,
+                    activityName: activity.name,
+                    studentName: registration.fullName,
+                    nationalId: registration.nationalId,
+                    status: 'checked-in',
+                    assignedSeat: seatNumberInput.trim(),
+                    timestamp: serverTimestamp(),
+                    adminId: 'admin'
+                });
 
                 flexMessage = createCheckInSuccessFlex({
                     courseName: courses[activity.categoryId] || 'ทั่วไป',
@@ -253,6 +293,16 @@ export default function UniversalScannerPage() {
             const regRef = doc(db, 'registrations', registration.id);
             await updateDoc(regRef, { status: 'completed', completedAt: serverTimestamp() });
             
+            await addDoc(collection(db, 'checkInLogs'), {
+                activityId: activity.id,
+                activityName: activity.name,
+                studentName: registration.fullName,
+                nationalId: registration.nationalId,
+                status: 'completed',
+                timestamp: serverTimestamp(),
+                adminId: 'admin'
+            });
+
             if (settings.onCheckOut && lineUserId) {
                 const flexMessage = createEvaluationRequestFlex({
                     activityId: registration.activityId,

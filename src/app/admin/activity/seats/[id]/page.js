@@ -30,14 +30,14 @@ export default function SeatAssignmentPage({ params }) {
   const [message, setMessage] = useState('');
   
   const [form, setForm] = useState({
-    fullName: '', studentId: '', nationalId: '', course: '', timeSlot: ''
+    fullName: '', studentId: '', nationalId: '', course: '', timeSlot: '', displayQueueNumber: ''
   });
 
   const [editStates, setEditStates] = useState({});
   const [courseOptions, setCourseOptions] = useState([]);
   const [timeSlotOptions, setTimeSlotOptions] = useState([]);
 
-  // ✅ Helper function to find lineUserId from studentProfiles
+  // Helper function to find lineUserId from studentProfiles
   const findLineUserId = async (nationalId) => {
     if (!nationalId) return null;
     const profileQuery = query(collection(db, 'studentProfiles'), where("nationalId", "==", nationalId), limit(1));
@@ -80,7 +80,8 @@ export default function SeatAssignmentPage({ params }) {
         initialEdits[r.id] = { 
           seatNumber: r.seatNumber || '', 
           course: r.course || '', 
-          timeSlot: r.timeSlot || '' 
+          timeSlot: r.timeSlot || '',
+          displayQueueNumber: r.displayQueueNumber || ''
         };
       });
       setEditStates(initialEdits);
@@ -118,14 +119,14 @@ export default function SeatAssignmentPage({ params }) {
   
   const handleAddParticipant = async (e) => {
       e.preventDefault();
-      const { fullName, nationalId, course, timeSlot, studentId } = form;
+      const { fullName, nationalId, course, timeSlot, studentId, displayQueueNumber } = form;
       if (!fullName || !nationalId || (activity?.type === 'queue' && (!course || !timeSlot))) {
           setMessage('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
           return;
       }
 
       try {
-          const lineUserId = await findLineUserId(nationalId); // ✅ Find existing lineUserId
+          const lineUserId = await findLineUserId(nationalId);
           await addDoc(collection(db, 'registrations'), {
               activityId,
               courseId: activity?.courseId || null,
@@ -137,10 +138,11 @@ export default function SeatAssignmentPage({ params }) {
               status: 'registered',
               registeredBy: 'admin_manual_add',
               registeredAt: serverTimestamp(),
-              lineUserId: lineUserId, // ✅ Add it here
+              lineUserId: lineUserId,
+              displayQueueNumber: displayQueueNumber || null,
           });
           setMessage('เพิ่มรายชื่อสำเร็จ!');
-          setForm({ fullName: '', studentId: '', nationalId: '', course: '', timeSlot: '' });
+          setForm({ fullName: '', studentId: '', nationalId: '', course: '', timeSlot: '', displayQueueNumber: '' });
           fetchData();
       } catch (error) {
           setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
@@ -172,10 +174,9 @@ export default function SeatAssignmentPage({ params }) {
             
             try {
                 const batch = writeBatch(db);
-                // ✅ Process each registrant one by one to find their lineUserId
                 for (const reg of newRegistrants) {
                     if (reg.fullName && reg.nationalId) {
-                        const lineUserId = await findLineUserId(reg.nationalId); // Find lineUserId
+                        const lineUserId = await findLineUserId(reg.nationalId);
                         const newRegRef = doc(collection(db, 'registrations'));
                         batch.set(newRegRef, {
                             activityId,
@@ -188,7 +189,8 @@ export default function SeatAssignmentPage({ params }) {
                             status: 'registered',
                             registeredBy: 'admin_csv_import',
                             registeredAt: serverTimestamp(),
-                            lineUserId: lineUserId, // Add it here
+                            lineUserId: lineUserId,
+                            displayQueueNumber: reg.displayQueueNumber || null,
                         });
                     }
                 }
@@ -211,6 +213,7 @@ export default function SeatAssignmentPage({ params }) {
     { label: "nationalId", key: "nationalId" },
     { label: "course", key: "course" },
     { label: "timeSlot", key: "timeSlot" },
+    { label: "displayQueueNumber", key: "displayQueueNumber" },
   ];
 
   const csvExportData = registrants.map(reg => ({
@@ -219,6 +222,7 @@ export default function SeatAssignmentPage({ params }) {
       nationalId: reg.nationalId || '',
       course: reg.course || '',
       timeSlot: reg.timeSlot || '',
+      displayQueueNumber: reg.displayQueueNumber || '',
   }));
 
   if (isLoading) return <div className="text-center p-10 font-sans">กำลังโหลด...</div>;
@@ -242,7 +246,7 @@ export default function SeatAssignmentPage({ params }) {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                           นำเข้าไฟล์ CSV (ต้องมี Header: fullName, nationalId)
+                           นำเข้าไฟล์ CSV (Header: fullName, nationalId, course, timeSlot, displayQueueNumber)
                         </label>
                         <input 
                             type="file" 
@@ -255,10 +259,10 @@ export default function SeatAssignmentPage({ params }) {
                         <CSVLink
                             data={csvExportData}
                             headers={csvExportHeaders}
-                            filename={`import_template_${activityId}.csv`}
+                            filename={`registrants_${activityId}.csv`}
                             className="w-full text-center block px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700"
                         >
-                            Export ข้อมูลสำหรับ Import
+                            Export ข้อมูลทั้งหมดเป็น CSV
                         </CSVLink>
                     </div>
                 </div>
@@ -279,6 +283,7 @@ export default function SeatAssignmentPage({ params }) {
                                 <option value="">เลือกช่วงเวลา*</option>
                                 {timeSlotOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                             </select>
+                             <input type="text" value={form.displayQueueNumber} onChange={e => setForm({...form, displayQueueNumber: e.target.value})} placeholder="กำหนดคิว (ถ้ามี)" className="p-2 border rounded w-full" />
                         </>
                     )}
                     <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">เพิ่ม</button>
@@ -298,6 +303,7 @@ export default function SeatAssignmentPage({ params }) {
                         <>
                             <th className="p-2">หลักสูตร</th>
                             <th className="p-2">ช่วงเวลา</th>
+                            <th className="p-2">คิว</th>
                         </>
                     ) : (
                         <th className="p-2">เลขที่นั่ง</th>
@@ -325,6 +331,15 @@ export default function SeatAssignmentPage({ params }) {
                                         <option value="">เลือกเวลา</option>
                                         {timeSlotOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                                     </select>
+                                </td>
+                                <td className="p-2">
+                                    <input 
+                                        type="text" 
+                                        value={editStates[reg.id]?.displayQueueNumber || ''} 
+                                        onChange={(e) => handleInputChange(reg.id, 'displayQueueNumber', e.target.value)} 
+                                        className="p-1 border rounded w-24"
+                                        placeholder="เช่น A1"
+                                    />
                                 </td>
                             </>
                         ) : (

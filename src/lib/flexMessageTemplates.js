@@ -162,7 +162,7 @@ export const createQueueCheckInSuccessFlex = ({ activityName, fullName, course, 
       { type: "text", text: "หมายเลขคิวของคุณคือ", color: "#E6E6FA" },
       { type: "text", text: String(queueNumber) || "-", size: "4xl", weight: "bold", color: "#FFFFFF" }
     ],
-    backgroundColor: "#0b0084",
+    backgroundColor: "#071D4A",
     alignItems: "center",
     paddingAll: "20px"
   }

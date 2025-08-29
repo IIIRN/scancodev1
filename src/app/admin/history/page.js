@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '../../../lib/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore'; // ✅ Import onSnapshot
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 // ฟังก์ชันสำหรับจัดรูปแบบวันที่ให้อ่านง่าย
 const formatTimestamp = (timestamp) => {
@@ -60,7 +60,7 @@ export default function AdminHistoryPage() {
                       เช็คอิน <span className="text-blue-600">{log.studentName}</span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      กิจกรรม: {log.activityName} (ที่นั่ง: {log.assignedSeat})
+                      กิจกรรม: {log.activityName} (ที่นั่ง/คิว: {log.assignedSeat})
                     </p>
                   </div>
                   <div className="text-right text-sm text-gray-500">

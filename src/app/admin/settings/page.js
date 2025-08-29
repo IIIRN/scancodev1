@@ -6,12 +6,12 @@ import { collection, addDoc, onSnapshot, doc, deleteDoc, serverTimestamp, getDoc
 
 // ToggleSwitch Component
 const ToggleSwitch = ({ label, enabled, onChange }) => (
-    <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border cursor-pointer">
-        <span className="text-gray-700 font-medium">{label}</span>
+    <label className="flex items-center justify-between cursor-pointer p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+        <span className="text-gray-700 font-medium text-sm">{label}</span>
         <div className="relative">
             <input type="checkbox" className="sr-only" checked={enabled} onChange={onChange} />
-            <div className={`block w-14 h-8 rounded-full transition-colors ${enabled ? 'bg-primary' : 'bg-gray-300'}`}></div>
-            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full shadow-md transition-transform ${enabled ? 'transform translate-x-6' : ''}`}></div>
+            <div className={`block w-12 h-6 rounded-full transition-colors ${enabled ? 'bg-primary' : 'bg-gray-300'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full shadow-md transition-transform ${enabled ? 'transform translate-x-6' : ''}`}></div>
         </div>
     </label>
 );
@@ -117,9 +117,9 @@ export default function SettingsPage() {
                 <h1 className="text-3xl font-bold mb-6 text-gray-800">ตั้งค่าระบบ</h1>
                 {message && <p className="text-center mb-4 font-semibold text-blue-700">{message}</p>}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Notification Settings */}
-                    <div className="bg-white p-6 rounded-lg shadow-md md:col-span-2">
+                    <div className="bg-white p-6 rounded-lg shadow-md lg:col-span-3">
                         <h2 className="text-xl font-semibold mb-4 text-gray-700">การแจ้งเตือน LINE</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <ToggleSwitch label="แจ้งเตือนเมื่อเช็คอิน" enabled={notificationSettings.onCheckIn} onChange={(e) => handleSettingChange('onCheckIn', e.target.checked)} />
