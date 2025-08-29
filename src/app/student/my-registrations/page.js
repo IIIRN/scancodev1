@@ -46,7 +46,12 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr, hasEvaluated }) 
           reg.queueNumber ? (
             <><span className="text-xs opacity-75">คิวของคุณ</span><span className="text-4xl font-bold tracking-wider">{reg.queueNumber}</span></>
           ) : (
-            <><TicketIcon /><span className="text-xs font-semibold mt-2">รอคิว</span></>
+            <>
+              {/* ✅ Updated Section to show timeSlot */}
+              <span className="text-xs opacity-75">เวลาที่ลงทะเบียน</span>
+              <span className="text-2xl font-bold tracking-wider my-1">{reg.timeSlot || '-'}</span>
+              <span className="text-xs font-semibold">รอรับคิว</span>
+            </>
           )
         ) : reg.seatNumber ? (
           <><span className="text-xs opacity-75">เลขที่นั่งของคุณ</span><span className="text-4xl font-bold tracking-wider">{reg.seatNumber}</span></>

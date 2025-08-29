@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../../../../../lib/firebase';
 import {
-  doc, getDoc, collection, query, where, onSnapshot, updateDoc, writeBatch, serverTimestamp, addDoc, deleteDoc, orderBy
+  doc, getDoc, collection, query, where, onSnapshot, updateDoc, writeBatch, serverTimestamp, addDoc, deleteDoc, orderBy, limit
 } from 'firebase/firestore';
 import { useParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -56,6 +56,18 @@ export default function QueueCallPage() {
         const unsubscribe = fetchData();
         return () => unsubscribe.then(u => u && u());
     }, [fetchData]);
+    
+    // ✅ Helper function to find lineUserId from studentProfiles
+    const findLineUserId = async (nationalId) => {
+        if (!nationalId) return null;
+        const profileQuery = query(collection(db, 'studentProfiles'), where("nationalId", "==", nationalId), limit(1));
+        const profileSnapshot = await getDocs(profileQuery);
+        if (!profileSnapshot.empty) {
+            return profileSnapshot.docs[0].data().lineUserId;
+        }
+        return null;
+    };
+
 
     const handleChannelUpdate = async (channelId, field, value) => {
         const channelRef = doc(db, 'queueChannels', channelId);
@@ -115,24 +127,90 @@ export default function QueueCallPage() {
             batch.update(regRef, { calledAt: serverTimestamp() });
             await batch.commit();
 
-            if (settings.onQueueCall && nextInQueue.lineUserId) {
+            // ✅ Use the new logic to find lineUserId
+            const lineUserId = nextInQueue.lineUserId || await findLineUserId(nextInQueue.nationalId);
+
+            if (settings.onQueueCall && lineUserId) {
                 const flexMessage = createQueueCallFlex({
                     activityName: activity.name,
                     channelName: channel.channelName || `ช่องบริการ ${channel.channelNumber}`,
                     queueNumber: nextInQueue.queueNumber,
                     courseName: nextInQueue.course,
                 });
-                fetch('/api/send-notification', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: nextInQueue.lineUserId, flexMessage })
-                });
+                
+                try {
+                    const response = await fetch('/api/send-notification', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: lineUserId, flexMessage })
+                    });
+                    if (!response.ok) {
+                        const errorResult = await response.json();
+                        throw new Error(errorResult.message || 'API Error');
+                    }
+                } catch (notificationError) {
+                    alert(`เรียกคิวสำเร็จ แต่ส่งแจ้งเตือนไม่สำเร็จ: ${notificationError.message}`);
+                }
+            } else if (settings.onQueueCall && !lineUserId) {
+                alert('เรียกคิวสำเร็จ แต่ไม่สามารถส่งแจ้งเตือนได้เนื่องจากไม่พบ LINE User ID ของผู้ใช้');
             }
+
         } catch (error) {
             console.error("Error calling next queue:", error);
-            alert("เกิดข้อผิดพลาดในการเรียกคิว");
+            alert(`เกิดข้อผิดพลาดในการเรียกคิว: ${error.message}`);
         }
     };
+    
+    const handleRecall = async (channel) => {
+        if (!channel.currentQueueNumber) {
+            alert('ยังไม่มีคิวที่ถูกเรียกในช่องนี้');
+            return;
+        }
+
+        const currentRegistrant = registrants.find(r => r.queueNumber === channel.currentQueueNumber && r.course === channel.servingCourse);
+
+        if (!currentRegistrant) {
+            alert(`ไม่พบข้อมูลผู้ลงทะเบียนสำหรับคิวที่ ${channel.currentQueueNumber}`);
+            return;
+        }
+
+        try {
+            const settingsRef = doc(db, 'systemSettings', 'notifications');
+            const settingsSnap = await getDoc(settingsRef);
+            const settings = settingsSnap.exists() ? settingsSnap.data() : { onQueueCall: true };
+
+            // ✅ Use the new logic to find lineUserId
+            const lineUserId = currentRegistrant.lineUserId || await findLineUserId(currentRegistrant.nationalId);
+
+            if (settings.onQueueCall && lineUserId) {
+                const flexMessage = createQueueCallFlex({
+                    activityName: activity.name,
+                    channelName: channel.channelName || `ช่องบริการ ${channel.channelNumber}`,
+                    queueNumber: currentRegistrant.queueNumber,
+                    courseName: currentRegistrant.course,
+                });
+
+                const response = await fetch('/api/send-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: lineUserId, flexMessage })
+                });
+
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.message || 'API Error');
+                }
+                alert(`ส่งแจ้งเตือนเรียกคิวที่ ${channel.currentQueueNumber} ซ้ำอีกครั้งสำเร็จ!`);
+            } else if (settings.onQueueCall && !lineUserId) {
+                alert('ไม่สามารถส่งแจ้งเตือนได้เนื่องจากไม่พบ LINE User ID ของผู้ใช้');
+            } else {
+                 alert('ระบบปิดการแจ้งเตือนเรียกคิวอยู่');
+            }
+        } catch (error) {
+            alert(`เกิดข้อผิดพลาดในการส่งแจ้งเตือน: ${error.message}`);
+        }
+    };
+
 
     if (isLoading) return <p className="text-center p-8 font-sans">กำลังโหลด...</p>;
     
@@ -188,6 +266,9 @@ export default function QueueCallPage() {
                                 <div className="flex gap-3">
                                     <button onClick={() => handleCallNext(channel)} className="w-full py-3 bg-primary text-white font-bold rounded-md hover:bg-primary-hover disabled:bg-gray-400 transition-colors" disabled={!channel.servingCourse}>
                                         เรียกคิวถัดไป
+                                    </button>
+                                    <button onClick={() => handleRecall(channel)} className="py-3 px-4 bg-card text-white rounded-md hover:opacity-90 disabled:bg-gray-400 transition-colors" disabled={!channel.currentQueueNumber}>
+                                        เรียกซ้ำ
                                     </button>
                                     <button onClick={() => handleDeleteChannel(channel.id)} className="py-3 px-4 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
                                         ลบ
