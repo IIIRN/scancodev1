@@ -5,10 +5,10 @@ import { db } from '../../../../lib/firebase';
 import { collection, getDocs, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 
 export default function AddActivityPage() {
-  const [courses, setCourses] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState('');
+  const [categories, setCategories] = useState([]); // ✅ Renamed from courses
+  const [selectedCategory, setSelectedCategory] = useState(''); // ✅ Renamed from selectedCourse
   const [activityName, setActivityName] = useState('');
-  const [activityType, setActivityType] = useState('event'); // State for activity type
+  const [activityType, setActivityType] = useState('event');
   const [capacity, setCapacity] = useState(50);
   const [activityDate, setActivityDate] = useState('');
   const [activityTime, setActivityTime] = useState('');
@@ -16,48 +16,50 @@ export default function AddActivityPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newCourseName, setNewCourseName] = useState('');
-  const [isSavingCourse, setIsSavingCourse] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState(''); // ✅ Renamed from newCourseName
+  const [isSavingCategory, setIsSavingCategory] = useState(false); // ✅ Renamed from isSavingCourse
 
-  const fetchCourses = useCallback(async () => {
+  // ✅ Fetch categories instead of courses
+  const fetchCategories = useCallback(async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'courses'));
-      const coursesData = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(collection(db, 'categories'));
+      const categoriesData = querySnapshot.docs.map(doc => ({
         id: doc.id, ...doc.data()
       }));
-      setCourses(coursesData);
-      if (!selectedCourse && coursesData.length > 0) {
-        setSelectedCourse(coursesData[0].id);
+      setCategories(categoriesData);
+      if (!selectedCategory && categoriesData.length > 0) {
+        setSelectedCategory(categoriesData[0].id);
       }
     } catch (error) {
-      console.error("Error fetching courses: ", error);
+      console.error("Error fetching categories: ", error);
       setMessage("เกิดข้อผิดพลาดในการดึงข้อมูลหมวดหมู่");
     }
-  }, [selectedCourse]);
+  }, [selectedCategory]);
 
   useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses]);
+    fetchCategories();
+  }, [fetchCategories]);
 
-  const handleSaveCourse = async () => {
-    if (!newCourseName.trim()) {
+  // ✅ Save new category
+  const handleSaveCategory = async () => {
+    if (!newCategoryName.trim()) {
       alert("กรุณาใส่ชื่อหมวดหมู่"); return;
     }
-    setIsSavingCourse(true);
+    setIsSavingCategory(true);
     try {
-      const docRef = await addDoc(collection(db, 'courses'), {
-        name: newCourseName, createdAt: serverTimestamp()
+      const docRef = await addDoc(collection(db, 'categories'), {
+        name: newCategoryName, createdAt: serverTimestamp()
       });
-      await fetchCourses();
-      setSelectedCourse(docRef.id);
+      await fetchCategories();
+      setSelectedCategory(docRef.id);
       setIsModalOpen(false);
-      setNewCourseName('');
-      setMessage("✅ เพิ่มหลักหมวดหมู่สำเร็จ!");
+      setNewCategoryName('');
+      setMessage("✅ เพิ่มหมวดหมู่สำเร็จ!");
     } catch (error) {
-      console.error("Error adding course: ", error);
+      console.error("Error adding category: ", error);
       alert(`เกิดข้อผิดพลาด: ${error.message}`);
     } finally {
-      setIsSavingCourse(false);
+      setIsSavingCategory(false);
     }
   };
 
@@ -70,9 +72,9 @@ export default function AddActivityPage() {
       const jsDate = new Date(dateTimeString);
       const firestoreTimestamp = Timestamp.fromDate(jsDate);
       const newActivity = {
-        courseId: selectedCourse,
+        categoryId: selectedCategory, // ✅ Use categoryId
         name: activityName,
-        type: activityType, // Add activity type
+        type: activityType,
         capacity: Number(capacity),
         location: location,
         activityDate: firestoreTimestamp,
@@ -95,20 +97,20 @@ export default function AddActivityPage() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4">เพิ่มหลักหมวดหมู่</h2>
+            <h2 className="text-2xl font-bold mb-4">เพิ่มหมวดหมู่ใหม่</h2>
             <input
               type="text"
-              value={newCourseName}
-              onChange={(e) => setNewCourseName(e.target.value)}
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
               placeholder="ชื่อหมวดหมู่..."
               className="w-full p-2 border border-gray-300 rounded-md mb-4"
             />
             <div className="flex justify-end gap-3">
-              <button onClick={() => setIsModalOpen(false)} disabled={isSavingCourse} className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+              <button onClick={() => setIsModalOpen(false)} disabled={isSavingCategory} className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
                 ยกเลิก
               </button>
-              <button onClick={handleSaveCourse} disabled={isSavingCourse} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300">
-                {isSavingCourse ? 'กำลังบันทึก...' : 'บันทึก'}
+              <button onClick={handleSaveCategory} disabled={isSavingCategory} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300">
+                {isSavingCategory ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
             </div>
           </div>
@@ -120,12 +122,12 @@ export default function AddActivityPage() {
           <h1 className="text-3xl font-bold text-gray-800 mb-6">สร้างกิจกรรมใหม่</h1>
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
-              <label htmlFor="course" className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
               <div className="flex items-center gap-2">
-                <select id="course" value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} required className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                  {courses.length === 0
+                <select id="category" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} required className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  {categories.length === 0
                     ? <option>ไม่มีหมวดหมู่</option>
-                    : courses.map(course => <option key={course.id} value={course.id}>{course.name}</option>)
+                    : categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)
                   }
                 </select>
                 <button type="button" onClick={() => setIsModalOpen(true)} className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-lg font-bold">+</button>

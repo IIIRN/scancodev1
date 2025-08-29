@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { db } from '../../../../../lib/firebase';
 import {
   doc, getDoc, updateDoc, collection, query,
-  where, getDocs, writeBatch, serverTimestamp, deleteDoc, addDoc, onSnapshot
+  where, getDocs, writeBatch, serverTimestamp, deleteDoc, addDoc, onSnapshot, limit
 } from 'firebase/firestore';
 import Papa from "papaparse";
 import { CSVLink } from "react-csv";
@@ -26,17 +26,24 @@ export default function SeatAssignmentPage({ params }) {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   
-  // State for adding new participant
   const [form, setForm] = useState({
     fullName: '', studentId: '', nationalId: '', course: '', timeSlot: ''
   });
 
-  // State for editing individual registrants
   const [editStates, setEditStates] = useState({});
-  
-  // State for options from settings
   const [courseOptions, setCourseOptions] = useState([]);
   const [timeSlotOptions, setTimeSlotOptions] = useState([]);
+
+  // ✅ Helper function to find lineUserId from studentProfiles
+  const findLineUserId = async (nationalId) => {
+    if (!nationalId) return null;
+    const profileQuery = query(collection(db, 'studentProfiles'), where("nationalId", "==", nationalId), limit(1));
+    const profileSnapshot = await getDocs(profileQuery);
+    if (!profileSnapshot.empty) {
+        return profileSnapshot.docs[0].data().lineUserId;
+    }
+    return null;
+  };
 
   useEffect(() => {
     const unsubCourses = onSnapshot(collection(db, 'courseOptions'), (snapshot) => {
@@ -115,6 +122,7 @@ export default function SeatAssignmentPage({ params }) {
       }
 
       try {
+          const lineUserId = await findLineUserId(nationalId); // ✅ Find existing lineUserId
           await addDoc(collection(db, 'registrations'), {
               activityId,
               courseId: activity?.courseId || null,
@@ -126,10 +134,11 @@ export default function SeatAssignmentPage({ params }) {
               status: 'registered',
               registeredBy: 'admin_manual_add',
               registeredAt: serverTimestamp(),
+              lineUserId: lineUserId, // ✅ Add it here
           });
           setMessage('เพิ่มรายชื่อสำเร็จ!');
           setForm({ fullName: '', studentId: '', nationalId: '', course: '', timeSlot: '' });
-          fetchData(); // Refresh data
+          fetchData();
       } catch (error) {
           setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
       }
@@ -140,7 +149,7 @@ export default function SeatAssignmentPage({ params }) {
       try {
         await deleteDoc(doc(db, 'registrations', registrantId));
         setMessage('ลบข้อมูลสำเร็จ');
-        fetchData(); // Refresh data
+        fetchData();
       } catch (error) {
         setMessage(`เกิดข้อผิดพลาดในการลบ: ${error.message}`);
       }
@@ -160,8 +169,10 @@ export default function SeatAssignmentPage({ params }) {
             
             try {
                 const batch = writeBatch(db);
-                newRegistrants.forEach(reg => {
+                // ✅ Process each registrant one by one to find their lineUserId
+                for (const reg of newRegistrants) {
                     if (reg.fullName && reg.nationalId) {
+                        const lineUserId = await findLineUserId(reg.nationalId); // Find lineUserId
                         const newRegRef = doc(collection(db, 'registrations'));
                         batch.set(newRegRef, {
                             activityId,
@@ -174,9 +185,10 @@ export default function SeatAssignmentPage({ params }) {
                             status: 'registered',
                             registeredBy: 'admin_csv_import',
                             registeredAt: serverTimestamp(),
+                            lineUserId: lineUserId, // Add it here
                         });
                     }
-                });
+                }
                 await batch.commit();
                 setMessage(`✅ นำเข้าข้อมูล ${newRegistrants.length} รายการสำเร็จ!`);
                 fetchData();
@@ -190,7 +202,6 @@ export default function SeatAssignmentPage({ params }) {
     });
   };
 
-  // ✅ Headers for CSV export, keys and labels are now identical for re-import compatibility
   const csvExportHeaders = [
     { label: "fullName", key: "fullName" },
     { label: "studentId", key: "studentId" },
@@ -199,7 +210,6 @@ export default function SeatAssignmentPage({ params }) {
     { label: "timeSlot", key: "timeSlot" },
   ];
 
-  // ✅ Data for export, contains only the necessary fields for re-import
   const csvExportData = registrants.map(reg => ({
       fullName: reg.fullName || '',
       studentId: reg.studentId || '',
@@ -207,7 +217,6 @@ export default function SeatAssignmentPage({ params }) {
       course: reg.course || '',
       timeSlot: reg.timeSlot || '',
   }));
-
 
   if (isLoading) return <div className="text-center p-10 font-sans">กำลังโหลด...</div>;
 

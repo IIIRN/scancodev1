@@ -29,7 +29,7 @@ const TicketIcon = () => (
 );
 const RegistrationCard = ({ reg, activities, courses, onShowQr, hasEvaluated }) => {
   const activity = activities[reg.activityId];
-  const course = activity ? courses[activity.courseId] : null;
+  const course = activity ? courses[activity.categoryId] : null; // ✅ Use categoryId
   if (!activity) return null;
   const activityDate = activity.activityDate?.toDate();
   const getStatusDisplay = () => {
@@ -43,11 +43,10 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr, hasEvaluated }) 
     <div className="bg-white rounded-xl shadow-lg flex overflow-hidden">
       <div className="flex-none w-32 bg-primary text-white flex flex-col justify-center items-center p-4 text-center">
         {activity.type === 'queue' ? (
-          reg.queueNumber ? (
-            <><span className="text-xs opacity-75">คิวของคุณ</span><span className="text-4xl font-bold tracking-wider">{reg.queueNumber}</span></>
+          reg.displayQueueNumber ? ( // ✅ Check for displayQueueNumber first
+            <><span className="text-xs opacity-75">คิวของคุณ</span><span className="text-4xl font-bold tracking-wider">{reg.displayQueueNumber}</span></>
           ) : (
             <>
-              {/* ✅ Updated Section to show timeSlot */}
               <span className="text-xs opacity-75">เวลาที่ลงทะเบียน</span>
               <span className="text-2xl font-bold tracking-wider my-1">{reg.timeSlot || '-'}</span>
               <span className="text-xs font-semibold">รอรับคิว</span>
@@ -75,7 +74,7 @@ const RegistrationCard = ({ reg, activities, courses, onShowQr, hasEvaluated }) 
             )}
           </div>
           <h2 className="text-lg font-bold text-gray-800 mt-2">{activity.name}</h2>
-          <p className="text-sm text-gray-500">{course?.name || reg.course || 'หลักสูตรทั่วไป'}</p>
+          <p className="text-sm text-gray-500">{course?.name || reg.course || 'ทั่วไป'}</p>
         </div>
         {activityDate && (
             <div className="bg-gray-100 p-2 text-center text-sm text-gray-600 border-t">

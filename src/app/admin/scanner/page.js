@@ -5,9 +5,9 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { db } from '../../../lib/firebase';
 import {
   doc, getDoc, updateDoc, collection,
-  serverTimestamp, query, where, getDocs, runTransaction, Timestamp
+  serverTimestamp, query, where, getDocs, runTransaction, Timestamp, limit
 } from 'firebase/firestore';
-import { createCheckInSuccessFlex, createEvaluationRequestFlex } from '../../../lib/flexMessageTemplates';
+import { createCheckInSuccessFlex, createEvaluationRequestFlex, createQueueCheckInSuccessFlex } from '../../../lib/flexMessageTemplates';
 
 const CameraIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -20,6 +20,7 @@ export default function UniversalScannerPage() {
   const [searchMode, setSearchMode] = useState('scan');
   const [activities, setActivities] = useState([]);
   const [courses, setCourses] = useState({});
+  const [courseOptions, setCourseOptions] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [nationalIdInput, setNationalIdInput] = useState('');
   const [scannerState, setScannerState] = useState('idle');
@@ -33,10 +34,12 @@ export default function UniversalScannerPage() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const activitiesQuery = query(collection(db, 'activities'), where("activityDate", ">=", Timestamp.fromDate(today)));
-      const coursesQuery = collection(db, 'courses');
+      const categoriesQuery = collection(db, 'categories');
+      const coursesQuery = collection(db, 'courseOptions');
 
-      const [activitiesSnapshot, coursesSnapshot] = await Promise.all([
+      const [activitiesSnapshot, categoriesSnapshot, coursesSnapshot] = await Promise.all([
         getDocs(activitiesQuery),
+        getDocs(categoriesQuery), // ✅ Corrected this line
         getDocs(coursesQuery)
       ]);
 
@@ -44,12 +47,24 @@ export default function UniversalScannerPage() {
       activitiesData.sort((a, b) => b.activityDate.seconds - a.activityDate.seconds);
       setActivities(activitiesData);
       
-      const coursesMap = {};
-      coursesSnapshot.forEach(doc => { coursesMap[doc.id] = doc.data().name; });
-      setCourses(coursesMap);
+      const categoriesMap = {};
+      categoriesSnapshot.forEach(doc => { categoriesMap[doc.id] = doc.data().name; });
+      setCourses(categoriesMap);
+      
+      setCourseOptions(coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     };
     fetchData();
   }, []);
+
+  const findLineUserId = async (nationalId) => {
+    if (!nationalId) return null;
+    const profileQuery = query(collection(db, 'studentProfiles'), where("nationalId", "==", nationalId), limit(1));
+    const profileSnapshot = await getDocs(profileQuery);
+    if (!profileSnapshot.empty) {
+        return profileSnapshot.docs[0].data().lineUserId;
+    }
+    return null;
+  };
 
   const stopScanner = async () => {
     if (qrScannerRef.current && qrScannerRef.current.isScanning) {
@@ -95,6 +110,21 @@ export default function UniversalScannerPage() {
         }
         
         const registrationData = { id: regDoc.id, ...regDoc.data() };
+
+        if (scanMode === 'check-in' && registrationData.status === 'checked-in') {
+            const queueInfo = registrationData.displayQueueNumber ? ` (${registrationData.displayQueueNumber})` : '';
+            setMessage(`✅ ${registrationData.fullName} ได้เช็คอินแล้ว${queueInfo}`);
+            setScannerState('idle');
+            setTimeout(() => resetState(), 3000);
+            return;
+        }
+        if (registrationData.status === 'completed') {
+            setMessage(`✅ ${registrationData.fullName} ได้จบกิจกรรมไปแล้ว`);
+            setScannerState('idle');
+            setTimeout(() => resetState(), 3000);
+            return;
+        }
+
         setFoundData({ registration: registrationData, activity: selectedActivity });
         if (registrationData.seatNumber) setSeatNumberInput(registrationData.seatNumber);
         setScannerState('found');
@@ -156,96 +186,89 @@ export default function UniversalScannerPage() {
         const settings = settingsSnap.exists() ? settingsSnap.data() : { onCheckIn: true, onCheckOut: true };
 
         const { registration, activity } = foundData;
-        
+        const lineUserId = registration.lineUserId || await findLineUserId(registration.nationalId);
+
         if (scanMode === 'check-in') {
+            let successMessage = `✅ เช็คอิน ${registration.fullName} สำเร็จ!`;
+            let flexMessage = null;
+
             if (activity.type === 'queue') {
-                // ✅ Logic for Queue Check-in
                 const result = await runTransaction(db, async (transaction) => {
                     const regRef = doc(db, 'registrations', registration.id);
                     const regDoc = await transaction.get(regRef);
                     if (!regDoc.exists()) throw new Error("ไม่พบข้อมูล");
-
                     const regData = regDoc.data();
-                    if (regData.status === 'checked-in') throw new Error(`ได้รับคิวแล้ว (คิวที่ ${regData.queueNumber})`);
                     if (!regData.course) throw new Error('นักเรียนยังไม่ได้ถูกกำหนดหลักสูตร');
-
-                    const q = query(collection(db, 'registrations'), 
-                        where("activityId", "==", selectedActivity.id),
-                        where("course", "==", regData.course),
-                        where("status", "==", "checked-in")
-                    );
-                    
+                    const q = query(collection(db, 'registrations'), where("activityId", "==", selectedActivity.id), where("course", "==", regData.course), where("status", "==", "checked-in"));
                     const checkedInSnapshot = await getDocs(q);
                     const nextQueueNumber = checkedInSnapshot.size + 1;
 
-                    transaction.update(regRef, { status: 'checked-in', queueNumber: nextQueueNumber });
+                    const courseInfo = courseOptions.find(c => c.name === regData.course);
+                    const prefix = courseInfo?.shortName || '';
+                    const displayQueueNumber = `${prefix}${nextQueueNumber}`;
                     
-                    return { name: regData.fullName, queue: nextQueueNumber, course: regData.course };
+                    transaction.update(regRef, { 
+                        status: 'checked-in', 
+                        queueNumber: nextQueueNumber,
+                        displayQueueNumber: displayQueueNumber
+                    });
+                    
+                    return { ...regData, queueNumber: nextQueueNumber, displayQueueNumber };
                 });
-                setMessage(`✅ สำเร็จ! ${result.name} ได้รับคิวที่ ${result.queue} (${result.course})`);
 
-            } else {
-                // ✅ Logic for Event Check-in
+                successMessage = `✅ สำเร็จ! ${result.fullName} ได้รับคิว ${result.displayQueueNumber} (${result.course})`;
+                
+                flexMessage = createQueueCheckInSuccessFlex({
+                    activityName: activity.name,
+                    fullName: result.fullName,
+                    course: result.course,
+                    timeSlot: result.timeSlot,
+                    queueNumber: result.displayQueueNumber
+                });
+
+            } else { // Event type check-in
                 if (!seatNumberInput.trim()) {
                     setMessage("กรุณากำหนดเลขที่นั่ง");
                     setScannerState('found');
                     return;
                 }
                 const regRef = doc(db, 'registrations', registration.id);
-                await updateDoc(regRef, { 
-                    status: 'checked-in', 
-                    seatNumber: seatNumberInput.trim() 
-                });
-                setMessage(`✅ เช็คอิน ${registration.fullName} สำเร็จ!`);
-            }
+                await updateDoc(regRef, { status: 'checked-in', seatNumber: seatNumberInput.trim() });
 
-            // Send notification if enabled
-            if (settings.onCheckIn && registration.lineUserId) {
-                // This will run for both queue and event types after they are processed
-                const flexMessage = createCheckInSuccessFlex({
-                    courseName: courses[activity.courseId] || registration.course || 'ทั่วไป',
+                flexMessage = createCheckInSuccessFlex({
+                    courseName: courses[activity.categoryId] || 'ทั่วไป',
                     activityName: activity.name,
                     fullName: registration.fullName,
                     studentId: registration.studentId,
-                    seatNumber: registration.seatNumber || seatNumberInput.trim() || '-'
-                });
-                await fetch('/api/send-notification', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: registration.lineUserId, flexMessage })
+                    seatNumber: seatNumberInput.trim()
                 });
             }
 
-        } else {
-            // Logic for Check-out
-            const regRef = doc(db, 'registrations', registration.id);
-            await updateDoc(regRef, {
-                status: 'completed',
-                completedAt: serverTimestamp()
-            });
+            if (settings.onCheckIn && lineUserId && flexMessage) {
+                await fetch('/api/send-notification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: lineUserId, flexMessage }) });
+            }
+            setMessage(successMessage);
 
-            if (settings.onCheckOut && registration.lineUserId) {
+        } else { // Check-out mode
+            const regRef = doc(db, 'registrations', registration.id);
+            await updateDoc(regRef, { status: 'completed', completedAt: serverTimestamp() });
+            
+            if (settings.onCheckOut && lineUserId) {
                 const flexMessage = createEvaluationRequestFlex({
                     activityId: registration.activityId,
                     activityName: activity.name,
                 });
-                await fetch('/api/send-notification', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: registration.lineUserId, flexMessage })
-                });
+                await fetch('/api/send-notification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: lineUserId, flexMessage }) });
             }
             setMessage(`✅ ${registration.fullName} จบกิจกรรมแล้ว`);
         }
         
         setTimeout(() => resetState(), 3000);
-
     } catch (err) {
         setMessage(`เกิดข้อผิดพลาด: ${err.message}`);
         setScannerState('found');
     }
   };
-
 
   return (
     <div className="max-w-xl mx-auto p-4 md:p-8 font-sans">

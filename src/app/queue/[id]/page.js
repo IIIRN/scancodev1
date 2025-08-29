@@ -43,7 +43,6 @@ export default function QueueDisplayPage() {
     }
   }, [activityId]);
 
-
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
@@ -72,8 +71,9 @@ export default function QueueDisplayPage() {
                 
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-100 px-6 py-8 text-center">
                   <p className="text-sm font-medium text-gray-500">คิวปัจจุบัน</p>
+                  {/* ✅ Display the prefixed queue number */}
                   <p className="text-8xl font-bold text-primary tracking-tighter my-2">
-                    {channel.currentQueueNumber || '-'}
+                    {channel.currentDisplayQueueNumber || '-'}
                   </p>
                   <p className="text-xl text-gray-700 h-8 truncate font-medium">
                     {channel.currentStudentName || 'ว่าง'}
