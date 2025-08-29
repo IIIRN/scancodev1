@@ -132,7 +132,7 @@ export default function MyRegistrationsPage() {
 
     // Auto-sync unlinked registrations in the background
     const syncUnlinkedRegistrations = async () => {
-      if (studentDbProfile.nationalId && liffProfile.userId) {
+      if (studentDbProfile && studentDbProfile.nationalId && liffProfile && liffProfile.userId) {
         const q = query(
           collection(db, 'registrations'),
           where('nationalId', '==', studentDbProfile.nationalId),
