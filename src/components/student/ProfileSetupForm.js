@@ -27,20 +27,22 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
       const q = query(registrationsRef, where("nationalId", "==", nationalId.trim()), limit(1));
       const querySnapshot = await getDocs(q);
 
-      let fullNameFromDb = null;
-      let studentIdFromDb = null;
-
-      if (!querySnapshot.empty) {
-        // If found, use the data from the registration
-        const regData = querySnapshot.docs[0].data();
-        fullNameFromDb = regData.fullName;
-        studentIdFromDb = regData.studentId || null;
+      if (querySnapshot.empty) {
+        // If no registration is found, show an error and stop.
+        setError('ไม่พบข้อมูลเลขบัตรประชาชนนี้ในระบบ กรุณาติดต่อเจ้าหน้าที่');
+        setIsSubmitting(false);
+        return;
       }
 
+      // If found, use the data from the registration
+      const regData = querySnapshot.docs[0].data();
+      const fullNameFromDb = regData.fullName;
+      const studentIdFromDb = regData.studentId || null;
+      
       // 2. Prepare profile data
       const profileData = {
-        fullName: fullNameFromDb || liffProfile.displayName, // Use DB name if found, otherwise fallback to LINE name
-        studentId: studentIdFromDb, // Use DB student ID if found
+        fullName: fullNameFromDb, // Use the name from the database
+        studentId: studentIdFromDb, // Use the student ID from the database
         nationalId: nationalId.trim(),
         createdAt: serverTimestamp()
       };
@@ -73,7 +75,7 @@ export default function ProfileSetupForm({ liffProfile, onProfileCreated }) {
               value={nationalId}
               onChange={(e) => setNationalId(e.target.value)}
               required
-              pattern="\d{13}"
+              pattern="\\d{13}"
               className="mt-1 w-full p-3 border border-gray-300 rounded-md"
               placeholder="กรุณากรอกเลขบัตรประชาชน"
             />
