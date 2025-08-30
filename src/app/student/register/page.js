@@ -140,7 +140,7 @@ function RegistrationComponent() {
           <p><strong>กิจกรรม:</strong> {activity?.name || 'กำลังโหลด...'}</p>
           <hr/>
           <p><strong>ชื่อ-สกุล:</strong> {studentDbProfile.fullName}</p>
-          <p><strong>รหัสนักศึกษา:</strong> {studentDbProfile.studentId}</p>
+          <p><strong>รหัสผู้สมัคร:</strong> {studentDbProfile.studentId}</p>
         </div>
         <p className="text-xs text-gray-500 mt-4">กรุณาตรวจสอบข้อมูลด้านบนให้ถูกต้อง หากต้องการแก้ไขโปรดไปที่หน้า &quot;การลงทะเบียนของฉัน&quot;</p>
         
