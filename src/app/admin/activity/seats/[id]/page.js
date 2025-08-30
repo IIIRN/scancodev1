@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { db } from '../../../../../lib/firebase';
 import {
   doc, getDoc, updateDoc, collection, query,
-  where, getDocs, writeBatch, serverTimestamp, deleteDoc, addDoc, onSnapshot, limit
+  where, getDocs, writeBatch, serverTimestamp, deleteDoc, addDoc, onSnapshot, limit, orderBy
 } from 'firebase/firestore';
 import Papa from "papaparse";
 import { CSVLink } from "react-csv";
@@ -34,10 +34,11 @@ export default function SeatAssignmentPage({ params }) {
   });
 
   const [editStates, setEditStates] = useState({});
+  const [originalEditStates, setOriginalEditStates] = useState({});
+  const [isEditMode, setIsEditMode] = useState(false);
   const [courseOptions, setCourseOptions] = useState([]);
   const [timeSlotOptions, setTimeSlotOptions] = useState([]);
 
-  // Helper function to find lineUserId from studentProfiles
   const findLineUserId = async (nationalId) => {
     if (!nationalId) return null;
     const profileQuery = query(collection(db, 'studentProfiles'), where("nationalId", "==", nationalId), limit(1));
@@ -49,12 +50,17 @@ export default function SeatAssignmentPage({ params }) {
   };
 
   useEffect(() => {
-    const unsubCourses = onSnapshot(collection(db, 'courseOptions'), (snapshot) => {
+    const unsubCourses = onSnapshot(query(collection(db, 'courseOptions'), orderBy('name')), (snapshot) => {
         setCourseOptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    const unsubTimeSlots = onSnapshot(collection(db, 'timeSlotOptions'), (snapshot) => {
+    
+    // --- จุดที่แก้ไข ---
+    // เพิ่ม query และ orderBy('name') เพื่อเรียงเวลาจากน้อยไปมาก
+    const timeSlotsQuery = query(collection(db, 'timeSlotOptions'), orderBy('name'));
+    const unsubTimeSlots = onSnapshot(timeSlotsQuery, (snapshot) => {
         setTimeSlotOptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+
     return () => {
         unsubCourses();
         unsubTimeSlots();
@@ -62,6 +68,7 @@ export default function SeatAssignmentPage({ params }) {
   }, []);
 
   const fetchData = useCallback(async () => {
+    // ... (โค้ดส่วนนี้เหมือนเดิม)
     setIsLoading(true);
     try {
       const activityDoc = await getDoc(doc(db, 'activities', activityId));
@@ -78,6 +85,9 @@ export default function SeatAssignmentPage({ params }) {
       const initialEdits = {};
       registrantsData.forEach(r => {
         initialEdits[r.id] = { 
+          fullName: r.fullName || '',
+          studentId: r.studentId || '',
+          nationalId: r.nationalId || '',
           seatNumber: r.seatNumber || '', 
           course: r.course || '', 
           timeSlot: r.timeSlot || '',
@@ -85,6 +95,7 @@ export default function SeatAssignmentPage({ params }) {
         };
       });
       setEditStates(initialEdits);
+      setOriginalEditStates(JSON.parse(JSON.stringify(initialEdits)));
 
     } catch (error) {
       console.error("เกิดข้อผิดพลาดในการดึงข้อมูล:", error);
@@ -98,6 +109,7 @@ export default function SeatAssignmentPage({ params }) {
     fetchData();
   }, [fetchData]);
 
+  // ... (ฟังก์ชัน handle ต่างๆ เช่น handleInputChange, handleUpdateAll ฯลฯ เหมือนเดิมทั้งหมด)
   const handleInputChange = (registrantId, field, value) => {
     setEditStates(prev => ({
       ...prev,
@@ -105,16 +117,32 @@ export default function SeatAssignmentPage({ params }) {
     }));
   };
 
-  const handleUpdateRegistrant = async (registrantId) => {
-    const dataToUpdate = editStates[registrantId];
+  const handleUpdateAll = async () => {
+    setIsLoading(true);
+    setMessage('กำลังบันทึกข้อมูลทั้งหมด...');
     try {
-      const registrantDocRef = doc(db, 'registrations', registrantId);
-      await updateDoc(registrantDocRef, dataToUpdate);
-      setMessage('✅ อัปเดตข้อมูลสำเร็จ');
-      setTimeout(() => setMessage(''), 2000);
+      const batch = writeBatch(db);
+      registrants.forEach(reg => {
+        const registrantDocRef = doc(db, 'registrations', reg.id);
+        const updatedData = editStates[reg.id];
+        batch.update(registrantDocRef, updatedData);
+      });
+      await batch.commit();
+      
+      setMessage('✅ บันทึกข้อมูลทั้งหมดสำเร็จ!');
+      setIsEditMode(false);
+      fetchData(); // Refresh data
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
+       setMessage(`เกิดข้อผิดพลาด: ${error.message}`);
+    } finally {
+        setIsLoading(false);
     }
+  };
+  
+  const handleCancelAll = () => {
+    setEditStates(originalEditStates); // Revert to original data
+    setIsEditMode(false);
   };
   
   const handleAddParticipant = async (e) => {
@@ -230,6 +258,7 @@ export default function SeatAssignmentPage({ params }) {
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-8 font-sans">
       <main className="max-w-7xl mx-auto">
+        {/* ... JSX for header and forms ... */}
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">จัดการข้อมูลนักเรียน</h1>
@@ -246,7 +275,7 @@ export default function SeatAssignmentPage({ params }) {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                           นำเข้าไฟล์ CSV (Header: fullName, nationalId, course, timeSlot, displayQueueNumber)
+                           นำเข้าไฟล์ CSV (Header: fullName, studentId, nationalId, course, timeSlot, displayQueueNumber)
                         </label>
                         <input 
                             type="file" 
@@ -271,7 +300,7 @@ export default function SeatAssignmentPage({ params }) {
                 <h2 className="text-xl font-semibold mb-4">เพิ่มนักเรียนรายบุคคล</h2>
                 <form onSubmit={handleAddParticipant} className="space-y-3">
                     <input type="text" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} placeholder="ชื่อ-สกุล*" className="p-2 border rounded w-full" required />
-                    <input type="text" value={form.studentId} onChange={e => setForm({...form, studentId: e.target.value})} placeholder="รหัสนักศึกษา" className="p-2 border rounded w-full" />
+                    <input type="text" value={form.studentId} onChange={e => setForm({...form, studentId: e.target.value})} placeholder="รหัสผู้สมัคร" className="p-2 border rounded w-full" />
                     <input type="text" value={form.nationalId} onChange={e => setForm({...form, nationalId: e.target.value})} placeholder="เลขบัตรประชาชน*" className="p-2 border rounded w-full" required pattern="\d{13}" />
                     {activity?.type === 'queue' && (
                         <>
@@ -292,12 +321,29 @@ export default function SeatAssignmentPage({ params }) {
         </div>
 
         <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+          <div className="p-4 flex justify-end items-center gap-3">
+            {isEditMode ? (
+              <>
+                <button onClick={handleUpdateAll} disabled={isLoading} className="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 disabled:bg-green-300">
+                  {isLoading ? 'กำลังบันทึก...' : 'บันทึกข้อมูลทั้งหมด'}
+                </button>
+                 <button onClick={handleCancelAll} className="px-4 py-2 bg-gray-500 text-white font-semibold rounded-md hover:bg-gray-600">
+                  ยกเลิก
+                </button>
+              </>
+            ) : (
+                 <button onClick={() => setIsEditMode(true)} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">
+                  แก้ไขข้อมูลทั้งหมด
+                </button>
+            )}
+          </div>
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-100">
                 <tr>
                     <th className="p-2">#</th>
                     <th className="p-2">ชื่อ-สกุล</th>
-                    <th className="p-2">รหัส นศ.</th>
+                    <th className="p-2">รหัสผู้สมัคร</th>
+                    <th className="p-2">เลขบัตร ปชช.</th>
                     <th className="p-2">สถานะ</th>
                     {activity?.type === 'queue' ? (
                         <>
@@ -312,45 +358,83 @@ export default function SeatAssignmentPage({ params }) {
                 </tr>
             </thead>
             <tbody>
-                {registrants.map((reg, index) => (
-                    <tr key={reg.id} className="border-b hover:bg-gray-50">
+                {registrants.map((reg, index) => {
+                    const isEditing = isEditMode;
+                    return (
+                    <tr key={reg.id} className={`border-b ${isEditing ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                         <td className="p-2">{index + 1}</td>
-                        <td className="p-2 font-medium">{reg.fullName}</td>
-                        <td className="p-2">{reg.studentId}</td>
+                        <td className="p-2">
+                           {isEditing ? (
+                                <input type="text" value={editStates[reg.id]?.fullName || ''} onChange={(e) => handleInputChange(reg.id, 'fullName', e.target.value)} className="p-1 border rounded w-full min-w-[150px]"/>
+                           ) : (
+                                <span>{reg.fullName}</span>
+                           )}
+                        </td>
+                        <td className="p-2">
+                           {isEditing ? (
+                                <input type="text" value={editStates[reg.id]?.studentId || ''} onChange={(e) => handleInputChange(reg.id, 'studentId', e.target.value)} className="p-1 border rounded w-full min-w-[100px]"/>
+                           ) : (
+                                <span>{reg.studentId}</span>
+                           )}
+                        </td>
+                         <td className="p-2">
+                           {isEditing ? (
+                                <input type="text" value={editStates[reg.id]?.nationalId || ''} onChange={(e) => handleInputChange(reg.id, 'nationalId', e.target.value)} className="p-1 border rounded w-full min-w-[120px]"/>
+                           ) : (
+                                <span>{reg.nationalId}</span>
+                           )}
+                        </td>
                         <td className="p-2">{translateStatus(reg.status)}</td>
                         {activity?.type === 'queue' ? (
                             <>
                                 <td className="p-2">
-                                    <select value={editStates[reg.id]?.course || ''} onChange={(e) => handleInputChange(reg.id, 'course', e.target.value)} className="p-1 border rounded w-full">
-                                        <option value="">เลือกหลักสูตร</option>
-                                        {courseOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                    </select>
+                                    {isEditing ? (
+                                        <select value={editStates[reg.id]?.course || ''} onChange={(e) => handleInputChange(reg.id, 'course', e.target.value)} className="p-1 border rounded w-full min-w-[120px]">
+                                            <option value="">เลือกหลักสูตร</option>
+                                            {courseOptions.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                        </select>
+                                    ) : (
+                                        <span>{reg.course}</span>
+                                    )}
                                 </td>
                                 <td className="p-2">
-                                    <select value={editStates[reg.id]?.timeSlot || ''} onChange={(e) => handleInputChange(reg.id, 'timeSlot', e.target.value)} className="p-1 border rounded">
-                                        <option value="">เลือกเวลา</option>
-                                        {timeSlotOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                                    </select>
+                                     {isEditing ? (
+                                        <select value={editStates[reg.id]?.timeSlot || ''} onChange={(e) => handleInputChange(reg.id, 'timeSlot', e.target.value)} className="p-1 border rounded  min-w-[100px]">
+                                            <option value="">เลือกเวลา</option>
+                                            {timeSlotOptions.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                        </select>
+                                     ) : (
+                                        <span>{reg.timeSlot}</span>
+                                     )}
                                 </td>
                                 <td className="p-2">
-                                    <input 
-                                        type="text" 
-                                        value={editStates[reg.id]?.displayQueueNumber || ''} 
-                                        onChange={(e) => handleInputChange(reg.id, 'displayQueueNumber', e.target.value)} 
-                                        className="p-1 border rounded w-24"
-                                        placeholder="เช่น A1"
-                                    />
+                                    {isEditing ? (
+                                        <input 
+                                            type="text" 
+                                            value={editStates[reg.id]?.displayQueueNumber || ''} 
+                                            onChange={(e) => handleInputChange(reg.id, 'displayQueueNumber', e.target.value)} 
+                                            className="p-1 border rounded w-24"
+                                            placeholder="เช่น A1"
+                                        />
+                                    ) : (
+                                        <span>{reg.displayQueueNumber}</span>
+                                    )}
                                 </td>
                             </>
                         ) : (
-                            <td className="p-2"><input type="text" value={editStates[reg.id]?.seatNumber || ''} onChange={(e) => handleInputChange(reg.id, 'seatNumber', e.target.value)} className="p-1 border rounded w-24"/></td>
+                            <td className="p-2">
+                                {isEditing ? (
+                                    <input type="text" value={editStates[reg.id]?.seatNumber || ''} onChange={(e) => handleInputChange(reg.id, 'seatNumber', e.target.value)} className="p-1 border rounded w-24"/>
+                                ) : (
+                                    <span>{reg.seatNumber}</span>
+                                )}
+                            </td>
                         )}
-                        <td className="p-2 flex gap-2">
-                            <button onClick={() => handleUpdateRegistrant(reg.id)} className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700">บันทึก</button>
+                        <td className="p-2">
                             <button onClick={() => handleDeleteRegistrant(reg.id)} className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">ลบ</button>
                         </td>
                     </tr>
-                ))}
+                )})}
             </tbody>
           </table>
           {registrants.length === 0 && <p className="p-6 text-center text-gray-500">ยังไม่มีนักเรียนลงทะเบียน</p>}

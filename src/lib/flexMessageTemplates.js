@@ -6,7 +6,7 @@
  * @param {string} data.courseName - ชื่อหลักสูตร
  * @param {string} data.activityName - ชื่อกิจกรรม
  * @param {string} data.fullName - ชื่อเต็มของนักเรียน
- * @param {string} data.studentId - รหัสนักศึกษา
+ * @param {string} data.studentId - รหัสผู้สมัคร
  * @param {string} data.seatNumber - เลขที่นั่ง
  * @returns {object} - JSON Object ของ Flex Message
  */
@@ -60,7 +60,7 @@ export const createCheckInSuccessFlex = ({ courseName, activityName, fullName, s
             layout: "baseline",
             spacing: "sm",
             contents: [
-              { type: "text", text: "รหัสนักศึกษา", color: "#AAAAAA", size: "sm", flex: 3 },
+              { type: "text", text: "รหัสผู้สมัคร", color: "#AAAAAA", size: "sm", flex: 3 },
               { type: "text", text: studentId || "-", wrap: true, color: "#666666", size: "sm", flex: 5 }
             ]
           }
@@ -221,7 +221,7 @@ export const createRegistrationSuccessFlex = ({ categoryName, activityName, full
             layout: "baseline",
             spacing: "sm",
             contents: [
-              { type: "text", text: "รหัสนักศึกษา", color: "#AAAAAA", size: "sm", flex: 3 },
+              { type: "text", text: "รหัสผู้สมัคร", color: "#AAAAAA", size: "sm", flex: 3 },
               { type: "text", text: studentId || "-", wrap: true, color: "#666666", size: "sm", flex: 5 }
             ]
           }

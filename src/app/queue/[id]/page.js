@@ -45,7 +45,7 @@ export default function QueueDisplayPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-extrabold text-primary tracking-tight">สถานะคิว</h1>
           <p className="text-xl text-gray-600 mt-2">{activity?.name}</p>
@@ -54,7 +54,7 @@ export default function QueueDisplayPage() {
         {isLoading ? (
           <div className="text-center text-gray-500">กำลังโหลดข้อมูลล่าสุด...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 md:gap-8">
             {channels.map((channel, index) => (
               <div 
                 key={channel.id} 
@@ -71,8 +71,7 @@ export default function QueueDisplayPage() {
                 
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-100 px-6 py-8 text-center">
                   <p className="text-sm font-medium text-gray-500">คิวปัจจุบัน</p>
-                  {/* ✅ Display the prefixed queue number */}
-                  <p className="text-8xl font-bold text-primary tracking-tighter my-2">
+                  <p className="text-5xl font-bold text-primary tracking-tighter my-2">
                     {channel.currentDisplayQueueNumber || '-'}
                   </p>
                   <p className="text-xl text-gray-700 h-8 truncate font-medium">
