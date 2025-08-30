@@ -8,12 +8,14 @@ export default function AdminNavbar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
+  // --- จุดที่แก้ไข: เพิ่ม "ข้อมูลนักเรียน" เข้าไปในเมนู ---
   const navLinks = [
     { name: 'แดชบอร์ดกิจกรรม', href: '/admin/activity' },
     { name: 'สแกนและค้นหา', href: '/admin/scanner' },
     { name: 'เรียกคิว', href: '/admin/queue/call' },
     { name: 'ผลประเมิน', href: '/admin/evaluation' },
     { name: 'ประวัติ', href: '/admin/history' },
+    { name: 'ข้อมูล', href: '/admin/registrants' },
     { name: 'ตั้งค่า', href: '/admin/settings' },
   ];
 

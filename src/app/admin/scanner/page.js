@@ -9,6 +9,25 @@ import {
 } from 'firebase/firestore';
 import { createCheckInSuccessFlex, createEvaluationRequestFlex, createQueueCheckInSuccessFlex } from '../../../lib/flexMessageTemplates';
 
+// --- ฟังก์ชันสำหรับแปลสถานะ ---
+const translateStatus = (status) => {
+  switch (status) {
+    case 'checked-in':
+      return 'เช็คอินแล้ว';
+    case 'registered':
+      return 'ลงทะเบียนแล้ว';
+    case 'completed':
+      return 'จบกิจกรรมแล้ว';
+    case 'cancelled':
+      return 'ยกเลิกแล้ว';
+    case 'waitlisted':
+      return 'รอคิว';
+    default:
+      return status || 'N/A';
+  }
+};
+
+
 const CameraIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -320,6 +339,7 @@ export default function UniversalScannerPage() {
     }
   };
 
+
   return (
     <div className="max-w-xl mx-auto p-4 md:p-8 font-sans">
       <div className="bg-white p-6 rounded-lg shadow-2xl min-h-[500px] flex flex-col items-center">
@@ -366,7 +386,8 @@ export default function UniversalScannerPage() {
                     <h2 className="text-2xl font-bold mb-4">ข้อมูลผู้ลงทะเบียน</h2>
                     <div className="p-4 bg-gray-50 rounded border">
                       <p><strong>ชื่อ:</strong> {foundData.registration.fullName}</p>
-                      <p><strong>สถานะ:</strong> {foundData.registration.status}</p>
+                      {/* --- จุดที่แก้ไข: ใช้ฟังก์ชันแปลภาษา --- */}
+                      <p><strong>สถานะ:</strong> {translateStatus(foundData.registration.status)}</p>
                     </div>
                     <form onSubmit={handleConfirm} className="mt-4">
                       {scanMode === 'check-in' && selectedActivity.type !== 'queue' && (

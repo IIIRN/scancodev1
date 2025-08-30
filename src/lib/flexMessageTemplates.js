@@ -75,7 +75,7 @@ export const createCheckInSuccessFlex = ({ courseName, activityName, fullName, s
       { type: "text", text: "เลขที่นั่ง", color: "#E6E6FA" },
       { type: "text", text: seatNumber || "-", size: "4xl", weight: "bold", color: "#FFFFFF" }
     ],
-    backgroundColor: "#283593",
+    backgroundColor: "#071D4A",
     alignItems: "center",
     paddingAll: "20px"
   }
